@@ -411,10 +411,16 @@ fun SetLoggingRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val weightStr = if (set.actualWeight == set.actualWeight.toInt().toDouble()) {
+                set.actualWeight.toInt().toString()
+            } else {
+                set.actualWeight.toString()
+            }
+
             // Weight Input
             OutlinedTextField(
-                value = if (set.actualWeight % 1.0 == 0.0) "${set.actualWeight.toInt()}" else "${set.actualWeight}",
-                onValueChange = { val str -> str.toDoubleOrNull()?.let { onWeightChange(it) } },
+                value = weightStr,
+                onValueChange = { str -> str.toDoubleOrNull()?.let { onWeightChange(it) } },
                 modifier = Modifier.width(78.dp),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -427,10 +433,12 @@ fun SetLoggingRow(
 
             Text("x", fontSize = 14.sp, color = TextMuted)
 
+            val repsStr = if (isStaticHold) "${set.durationSeconds}s" else set.actualReps.toString()
+
             // Reps or seconds Input
             OutlinedTextField(
-                value = if (isStaticHold) "${set.durationSeconds}s" else "${set.actualReps}",
-                onValueChange = { val str -> str.toIntOrNull()?.let { onRepsChange(it) } },
+                value = repsStr,
+                onValueChange = { str -> str.toIntOrNull()?.let { onRepsChange(it) } },
                 modifier = Modifier.width(70.dp),
                 singleLine = true,
                 enabled = !isStaticHold,
