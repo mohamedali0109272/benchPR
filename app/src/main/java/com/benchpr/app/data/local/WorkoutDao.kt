@@ -38,4 +38,7 @@ interface WorkoutDao {
 
     @Query("SELECT COUNT(*) FROM workout_logs")
     fun getTotalWorkoutsCount(): Flow<Int>
+
+    @Query("SELECT * FROM set_logs WHERE isCompleted = 1")
+    fun getAllCompletedSetLogs(): Flow<List<ExerciseSetLogEntity>>
 }

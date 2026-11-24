@@ -10,6 +10,9 @@ import com.benchpr.app.data.local.WorkoutWithSets
 import com.benchpr.app.data.model.ActiveExerciseState
 import com.benchpr.app.data.model.ActiveWorkoutState
 import com.benchpr.app.data.model.ExerciseSetState
+import com.benchpr.app.data.model.MuscleGroup
+import com.benchpr.app.data.model.MuscleRankInfo
+import com.benchpr.app.data.model.MuscleRankingEngine
 import com.benchpr.app.data.model.ProgramData
 import com.benchpr.app.data.model.WorkoutSessionTemplate
 import com.benchpr.app.data.preferences.UserPreferences
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -58,6 +62,26 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0
     )
+
+    val muscleRanks: StateFlow<Map<MuscleGroup, MuscleRankInfo>> = workoutDao.getAllCompletedSetLogs()
+        .map { sets ->
+            val volumeMap = mutableMapOf<MuscleGroup, Double>()
+            MuscleGroup.values().forEach { volumeMap[it] = 0.0 }
+
+            sets.forEach { set ->
+                val muscle = MuscleRankingEngine.guessMuscleGroup(set.exerciseName)
+                val setVolume = set.actualWeight * set.actualReps
+                volumeMap[muscle] = (volumeMap[muscle] ?: 0.0) + setVolume
+            }
+
+            volumeMap.mapValues { (muscle, volume) ->
+                MuscleRankingEngine.calculateRank(muscle, volume)
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = MuscleGroup.values().associateWith { MuscleRankingEngine.calculateRank(it, 0.0) }
+        )
 
     private val _activeWorkout = MutableStateFlow<ActiveWorkoutState?>(null)
     val activeWorkout: StateFlow<ActiveWorkoutState?> = _activeWorkout.asStateFlow()
