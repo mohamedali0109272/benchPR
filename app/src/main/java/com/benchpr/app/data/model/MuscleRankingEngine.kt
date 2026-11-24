@@ -40,8 +40,12 @@ object MuscleRankingEngine {
     fun guessMuscleGroup(exerciseName: String): MuscleGroup {
         val lower = exerciseName.lowercase()
         return when {
+            // Triceps-specific names must be checked before the generic "bench" match,
+            // otherwise "Close Grip Bench" is credited to chest.
+            lower.contains("close grip") || lower.contains("dip") || lower.contains("pushdown") ||
+                lower.contains("extension") || lower.contains("tricep") || lower.contains("single arm") -> MuscleGroup.TRICEPS
             lower.contains("bench") || lower.contains("fly") || lower.contains("incline") || lower.contains("chest") -> MuscleGroup.CHEST
-            lower.contains("dip") || lower.contains("pushdown") || lower.contains("extension") || lower.contains("tricep") -> MuscleGroup.TRICEPS
+            lower.contains("heavy single") -> MuscleGroup.CHEST
             lower.contains("overhead") || lower.contains("shoulder") || lower.contains("raise") || lower.contains("ohp") -> MuscleGroup.SHOULDERS
             lower.contains("row") || lower.contains("deadlift") || lower.contains("pulldown") || lower.contains("pull-up") || lower.contains("back") -> MuscleGroup.BACK
             lower.contains("squat") || lower.contains("leg") || lower.contains("quad") || lower.contains("hamstring") -> MuscleGroup.LEGS
