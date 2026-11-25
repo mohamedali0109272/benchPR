@@ -9,7 +9,9 @@ data class ExerciseTemplate(
     val targetReps: Int,
     val targetDurationSeconds: Int = 0,
     val totalSets: Int,
-    val isStaticHold: Boolean = false
+    val isStaticHold: Boolean = false,
+    /** Display-only rep range such as "8-12", used by split exercises. */
+    val repRange: String? = null
 )
 
 data class WorkoutSessionTemplate(

@@ -51,3 +51,9 @@ data class WorkoutWithSets(
     )
     val sets: List<ExerciseSetLogEntity>
 )
+
+/** Most recent completed weight for an exercise, with the unit it was logged in. */
+data class LastLift(
+    val weight: Double,
+    val unit: String
+)

@@ -1,5 +1,6 @@
 package com.benchpr.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +37,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.benchpr.app.data.model.ProgramData
 import com.benchpr.app.data.model.WorkoutSessionTemplate
+import com.benchpr.app.ui.components.AnimatedEntrance
+import com.benchpr.app.ui.components.ExercisePickerDialog
 import com.benchpr.app.ui.theme.AccentGreen
 import com.benchpr.app.ui.theme.BackgroundDark
 import com.benchpr.app.ui.theme.CardBorderDark
@@ -75,7 +79,9 @@ import com.benchpr.app.ui.viewmodel.WorkoutViewModel
 fun HomeScreen(
     viewModel: WorkoutViewModel,
     onStartSession: (Int) -> Unit,
-    onNavigateToHistory: () -> Unit
+    onNavigateToHistory: () -> Unit,
+    onQuickStart: (String?) -> Unit,
+    onOpenSplits: () -> Unit
 ) {
     val target1RM by viewModel.target1RM.collectAsState()
     val unit by viewModel.weightUnit.collectAsState()
@@ -83,6 +89,7 @@ fun HomeScreen(
     val totalWorkouts by viewModel.totalWorkoutsCompleted.collectAsState()
 
     var showEdit1RMDialog by remember { mutableStateOf(false) }
+    var showExercisePicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -146,8 +153,18 @@ fun HomeScreen(
             }
 
             item {
+                AnimatedEntrance(index = 1) {
+                    QuickStartCard(
+                        onStartEmpty = { onQuickStart(null) },
+                        onPickExercise = { showExercisePicker = true },
+                        onOpenSplits = onOpenSplits
+                    )
+                }
+            }
+
+            item {
                 Text(
-                    text = "PROGRAM SESSIONS",
+                    text = "BENCH PR PROGRAM",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     letterSpacing = 1.2.sp,
@@ -156,19 +173,29 @@ fun HomeScreen(
                 )
             }
 
-            items(ProgramData.ALL_SESSIONS) { sessionTemplate ->
-                SessionCard(
-                    session = sessionTemplate,
-                    target1RM = target1RM,
-                    unit = unit,
-                    onStartClick = { onStartSession(sessionTemplate.id) }
-                )
+            itemsIndexed(ProgramData.ALL_SESSIONS) { index, sessionTemplate ->
+                AnimatedEntrance(index = index + 2) {
+                    SessionCard(
+                        session = sessionTemplate,
+                        target1RM = target1RM,
+                        unit = unit,
+                        onStartClick = { onStartSession(sessionTemplate.id) }
+                    )
+                }
             }
 
             item {
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    if (showExercisePicker) {
+        ExercisePickerDialog(
+            title = "Start an exercise",
+            onPick = { onQuickStart(it.id) },
+            onDismiss = { showExercisePicker = false }
+        )
     }
 
     if (showEdit1RMDialog) {
@@ -182,6 +209,75 @@ fun HomeScreen(
                 showEdit1RMDialog = false
             }
         )
+    }
+}
+
+@Composable
+fun QuickStartCard(
+    onStartEmpty: () -> Unit,
+    onPickExercise: () -> Unit,
+    onOpenSplits: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorderDark, RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "QUICK START",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                color = PrimaryNeon,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = "Train what you feel like, no plan needed.",
+                fontSize = 13.sp,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onPickExercise,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryNeon,
+                    contentColor = BackgroundDark
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("START AN EXERCISE", fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onStartEmpty,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SecondaryNeon)
+                ) {
+                    Text("EMPTY WORKOUT", color = SecondaryNeon, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                OutlinedButton(
+                    onClick = onOpenSplits,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SecondaryNeon)
+                ) {
+                    Text("BROWSE SPLITS", color = SecondaryNeon, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
     }
 }
 

@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.benchpr.app.data.model.ExerciseItem
 import com.benchpr.app.data.model.ExerciseLibrary
 import com.benchpr.app.data.model.MuscleGroup
+import com.benchpr.app.ui.components.AnimatedEntrance
 import com.benchpr.app.ui.theme.BackgroundDark
 import com.benchpr.app.ui.theme.CardBorderDark
 import com.benchpr.app.ui.theme.PrimaryNeon
@@ -59,17 +63,12 @@ import com.benchpr.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExercisesScreen() {
+fun ExercisesScreen(onStartExercise: (String) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedMuscle by remember { mutableStateOf<MuscleGroup?>(null) }
 
     val filteredExercises = remember(searchQuery, selectedMuscle) {
-        ExerciseLibrary.PRESET_EXERCISES.filter { exercise ->
-            val matchesSearch = exercise.name.contains(searchQuery, ignoreCase = true) ||
-                    exercise.description.contains(searchQuery, ignoreCase = true)
-            val matchesMuscle = selectedMuscle == null || exercise.muscleGroup == selectedMuscle
-            matchesSearch && matchesMuscle
-        }
+        ExerciseLibrary.search(searchQuery, selectedMuscle)
     }
 
     Scaffold(
@@ -159,8 +158,10 @@ fun ExercisesScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(filteredExercises) { exercise ->
-                    ExerciseCard(exercise = exercise)
+                itemsIndexed(filteredExercises, key = { _, exercise -> exercise.id }) { index, exercise ->
+                    AnimatedEntrance(index = index.coerceAtMost(6)) {
+                        ExerciseCard(exercise = exercise, onStart = { onStartExercise(exercise.id) })
+                    }
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
             }
@@ -169,7 +170,7 @@ fun ExercisesScreen() {
 }
 
 @Composable
-fun ExerciseCard(exercise: ExerciseItem) {
+fun ExerciseCard(exercise: ExerciseItem, onStart: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -216,6 +217,33 @@ fun ExerciseCard(exercise: ExerciseItem) {
                 fontSize = 13.sp,
                 color = TextSecondary
             )
+
+            if (exercise.secondaryMuscles.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Also works: " + exercise.secondaryMuscles.joinToString { it.displayName },
+                    fontSize = 11.sp,
+                    color = TextMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = onStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryNeon,
+                    contentColor = BackgroundDark
+                ),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("START THIS EXERCISE", fontWeight = FontWeight.Black, fontSize = 13.sp, letterSpacing = 0.5.sp)
+            }
         }
     }
 }

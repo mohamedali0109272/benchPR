@@ -9,23 +9,33 @@ import com.benchpr.app.data.local.WorkoutLogEntity
 import com.benchpr.app.data.local.WorkoutWithSets
 import com.benchpr.app.data.model.ActiveExerciseState
 import com.benchpr.app.data.model.ActiveWorkoutState
+import com.benchpr.app.data.model.ExerciseItem
+import com.benchpr.app.data.model.ExerciseLibrary
 import com.benchpr.app.data.model.ExerciseSetState
+import com.benchpr.app.data.model.ExerciseTemplate
+import com.benchpr.app.data.model.LoggedSet
 import com.benchpr.app.data.model.MuscleGroup
 import com.benchpr.app.data.model.MuscleRankInfo
-import com.benchpr.app.data.model.MuscleRankingEngine
+import com.benchpr.app.data.model.OverallRank
 import com.benchpr.app.data.model.ProgramData
+import com.benchpr.app.data.model.RankingEngine
+import com.benchpr.app.data.model.Splits
 import com.benchpr.app.data.model.WorkoutSessionTemplate
 import com.benchpr.app.data.preferences.UserPreferences
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -43,6 +53,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = "kg"
+    )
+
+    val bodyweightKg: StateFlow<Double> = userPreferences.bodyweightKg.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = RankingEngine.DEFAULT_BODYWEIGHT_KG
     )
 
     val historyWorkouts: StateFlow<List<WorkoutWithSets>> = workoutDao.getAllWorkoutsWithSets().stateIn(
@@ -63,24 +79,38 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         initialValue = 0
     )
 
-    val muscleRanks: StateFlow<Map<MuscleGroup, MuscleRankInfo>> = workoutDao.getAllCompletedSetLogs()
-        .map { sets ->
-            val volumeMap = mutableMapOf<MuscleGroup, Double>()
-            MuscleGroup.values().forEach { volumeMap[it] = 0.0 }
+    /**
+     * Ranks are strength based: every completed set is converted to kilograms using the unit of the
+     * workout it was logged in, so switching between kg and lbs never distorts a rank.
+     */
+    val muscleRanks: StateFlow<Map<MuscleGroup, MuscleRankInfo>> = combine(
+        workoutDao.getAllWorkoutsWithSets(),
+        userPreferences.bodyweightKg
+    ) { workouts, bodyweight ->
+        val sets = workouts.flatMap { workout ->
+            workout.sets
+                .filter { it.isCompleted }
+                .map {
+                    LoggedSet(
+                        exerciseName = it.exerciseName,
+                        weightKg = RankingEngine.toKg(it.actualWeight, workout.workoutLog.unit),
+                        reps = it.actualReps
+                    )
+                }
+        }
+        RankingEngine.calculate(sets, bodyweight)
+    }.flowOn(Dispatchers.Default).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = RankingEngine.emptyRanks()
+    )
 
-            sets.forEach { set ->
-                val muscle = MuscleRankingEngine.guessMuscleGroup(set.exerciseName)
-                val setVolume = set.actualWeight * set.actualReps
-                volumeMap[muscle] = (volumeMap[muscle] ?: 0.0) + setVolume
-            }
-
-            volumeMap.mapValues { (muscle, volume) ->
-                MuscleRankingEngine.calculateRank(muscle, volume)
-            }
-        }.stateIn(
+    val overallRank: StateFlow<OverallRank> = muscleRanks
+        .map { RankingEngine.overall(it) }
+        .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = MuscleGroup.values().associateWith { MuscleRankingEngine.calculateRank(it, 0.0) }
+            initialValue = RankingEngine.overall(RankingEngine.emptyRanks())
         )
 
     private val _activeWorkout = MutableStateFlow<ActiveWorkoutState?>(null)
@@ -94,6 +124,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
 
     private var timerJob: Job? = null
+    private var isSaving = false
 
     fun updateTarget1RM(newTarget: Double) {
         viewModelScope.launch {
@@ -107,90 +138,224 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateBodyweightKg(kg: Double) {
+        if (kg < 20.0 || kg > 400.0) return
+        viewModelScope.launch {
+            userPreferences.updateBodyweightKg(kg)
+        }
+    }
+
+    // ---------------------------------------------------------------- starting workouts
+
+    /** Starts one of the three sessions of the original bench program. */
     fun startSession(sessionId: Int) {
         val template = ProgramData.ALL_SESSIONS.find { it.id == sessionId } ?: ProgramData.SESSION_1
         val currentTarget1RM = target1RM.value
-        val currentUnit = weightUnit.value
 
         val activeExercises = template.exercises.map { exercise ->
             val targetWeight = ProgramData.calculateWeight(currentTarget1RM, exercise.targetPercent)
-            val sets = (1..exercise.totalSets).map { index ->
-                ExerciseSetState(
-                    setIndex = index,
-                    targetWeight = targetWeight,
-                    targetReps = exercise.targetReps,
-                    actualWeight = targetWeight,
-                    actualReps = exercise.targetReps,
-                    isCompleted = false,
-                    durationSeconds = exercise.targetDurationSeconds
-                )
-            }
-            ActiveExerciseState(
-                template = exercise,
-                calculatedTargetWeight = targetWeight,
-                sets = sets
+            buildActiveExercise(exercise, targetWeight)
+        }
+        beginWorkout(template, activeExercises, currentTarget1RM)
+    }
+
+    /** Starts a day of one of the training splits. */
+    fun startSplitDay(splitId: String, dayIndex: Int) {
+        val split = Splits.findSplit(splitId) ?: return
+        val day = split.days.getOrNull(dayIndex) ?: return
+
+        val templates = day.exercises.mapIndexedNotNull { index, entry ->
+            val item = ExerciseLibrary.getById(entry.exerciseId) ?: return@mapIndexedNotNull null
+            ExerciseTemplate(
+                id = "${split.id}_${dayIndex}_$index",
+                name = item.name,
+                targetPercent = 0.0,
+                targetReps = entry.repsMax,
+                targetDurationSeconds = entry.durationSeconds,
+                totalSets = entry.sets,
+                isStaticHold = item.isTimed,
+                repRange = if (item.isTimed) null else entry.repRange
             )
         }
+        val session = WorkoutSessionTemplate(
+            id = 0,
+            title = "${split.name} - ${day.name}",
+            subtitle = day.focus,
+            goal = day.focus.lowercase(),
+            exercises = templates
+        )
+        beginWorkout(session, templates.map { buildActiveExercise(it, 0.0) }, target1RM.value)
+    }
 
+    /**
+     * Starts a freestyle workout. With an [exerciseId] the workout begins with that single exercise,
+     * otherwise it starts empty and exercises are added as the lifter goes.
+     */
+    fun startQuickWorkout(exerciseId: String? = null) {
+        val item = exerciseId?.let { ExerciseLibrary.getById(it) }
+        val session = WorkoutSessionTemplate(
+            id = 0,
+            title = item?.name ?: "Quick Workout",
+            subtitle = "Freestyle",
+            goal = "train what you want",
+            exercises = emptyList()
+        )
+        beginWorkout(session, emptyList(), target1RM.value)
+        if (item != null) addExercise(item)
+    }
+
+    private fun beginWorkout(
+        template: WorkoutSessionTemplate,
+        exercises: List<ActiveExerciseState>,
+        target1RMValue: Double
+    ) {
+        stopTimer()
+        isSaving = false
         _activeWorkout.value = ActiveWorkoutState(
             sessionTemplate = template,
-            target1RM = currentTarget1RM,
-            unit = currentUnit,
-            exercises = activeExercises,
+            target1RM = target1RMValue,
+            unit = weightUnit.value,
+            exercises = exercises,
             startTimeMillis = System.currentTimeMillis()
+        )
+        prefillLastWeights(exercises.map { it.template.name })
+    }
+
+    private fun buildActiveExercise(template: ExerciseTemplate, targetWeight: Double): ActiveExerciseState {
+        val sets = (1..template.totalSets).map { index ->
+            ExerciseSetState(
+                setIndex = index,
+                targetWeight = targetWeight,
+                targetReps = template.targetReps,
+                actualWeight = targetWeight,
+                actualReps = template.targetReps,
+                isCompleted = false,
+                durationSeconds = template.targetDurationSeconds
+            )
+        }
+        return ActiveExerciseState(
+            template = template,
+            calculatedTargetWeight = targetWeight,
+            sets = sets
         )
     }
 
-    fun toggleSetCompletion(exerciseIndex: Int, setIndex: Int) {
-        _activeWorkout.update { current ->
-            if (current == null) return@update null
-            val updatedExercises = current.exercises.mapIndexed { eIdx, exercise ->
-                if (eIdx == exerciseIndex) {
-                    val updatedSets = exercise.sets.mapIndexed { sIdx, set ->
-                        if (sIdx == setIndex) {
-                            set.copy(isCompleted = !set.isCompleted)
-                        } else set
-                    }
-                    exercise.copy(sets = updatedSets)
-                } else exercise
+    /** Fills empty weights with whatever the lifter last used for the same exercise. */
+    private fun prefillLastWeights(exerciseNames: List<String>) {
+        viewModelScope.launch {
+            for (name in exerciseNames.distinct()) {
+                val last = workoutDao.getLastLift(name) ?: continue
+                val unit = _activeWorkout.value?.unit ?: return@launch
+                val kg = RankingEngine.toKg(last.weight, last.unit)
+                val weight = (RankingEngine.fromKg(kg, unit) * 2.0).roundToInt() / 2.0
+                applyPrefill(name, weight)
             }
-            current.copy(exercises = updatedExercises)
         }
+    }
+
+    private fun applyPrefill(exerciseName: String, weight: Double) {
+        _activeWorkout.update { current ->
+            current?.copy(
+                exercises = current.exercises.map { exercise ->
+                    if (exercise.template.name == exerciseName && exercise.template.targetPercent <= 0.0) {
+                        exercise.copy(
+                            calculatedTargetWeight = weight,
+                            sets = exercise.sets.map { set ->
+                                if (!set.isCompleted && set.actualWeight == 0.0) {
+                                    set.copy(targetWeight = weight, actualWeight = weight)
+                                } else set
+                            }
+                        )
+                    } else exercise
+                }
+            )
+        }
+    }
+
+    // ---------------------------------------------------------------- editing the active workout
+
+    fun addExercise(item: ExerciseItem) {
+        val holdSeconds = if (item.isTimed) (if (item.id == "ex_static_hold") 30 else 45) else 0
+        val template = ExerciseTemplate(
+            id = "${item.id}_${System.nanoTime()}",
+            name = item.name,
+            targetPercent = 0.0,
+            targetReps = item.defaultReps,
+            targetDurationSeconds = holdSeconds,
+            totalSets = item.defaultSets,
+            isStaticHold = item.isTimed
+        )
+        _activeWorkout.update { current ->
+            current?.copy(exercises = current.exercises + buildActiveExercise(template, 0.0))
+        }
+        prefillLastWeights(listOf(item.name))
+    }
+
+    fun removeExercise(exerciseIndex: Int) {
+        _activeWorkout.update { current ->
+            if (current == null || exerciseIndex !in current.exercises.indices) return@update current
+            current.copy(exercises = current.exercises.filterIndexed { index, _ -> index != exerciseIndex })
+        }
+    }
+
+    fun addSet(exerciseIndex: Int) {
+        updateExercise(exerciseIndex) { exercise ->
+            val last = exercise.sets.lastOrNull()
+            val newSet = ExerciseSetState(
+                setIndex = exercise.sets.size + 1,
+                targetWeight = last?.targetWeight ?: 0.0,
+                targetReps = last?.targetReps ?: exercise.template.targetReps,
+                actualWeight = last?.actualWeight ?: 0.0,
+                actualReps = last?.actualReps ?: exercise.template.targetReps,
+                isCompleted = false,
+                durationSeconds = last?.durationSeconds ?: exercise.template.targetDurationSeconds
+            )
+            exercise.copy(sets = exercise.sets + newSet)
+        }
+    }
+
+    fun removeSet(exerciseIndex: Int, setIndex: Int) {
+        updateExercise(exerciseIndex) { exercise ->
+            if (exercise.sets.size <= 1 || setIndex !in exercise.sets.indices) return@updateExercise exercise
+            val remaining = exercise.sets.filterIndexed { index, _ -> index != setIndex }
+            exercise.copy(sets = remaining.mapIndexed { index, set -> set.copy(setIndex = index + 1) })
+        }
+    }
+
+    fun toggleSetCompletion(exerciseIndex: Int, setIndex: Int) {
+        updateSet(exerciseIndex, setIndex) { it.copy(isCompleted = !it.isCompleted) }
     }
 
     fun updateSetWeight(exerciseIndex: Int, setIndex: Int, weight: Double) {
-        _activeWorkout.update { current ->
-            if (current == null) return@update null
-            val updatedExercises = current.exercises.mapIndexed { eIdx, exercise ->
-                if (eIdx == exerciseIndex) {
-                    val updatedSets = exercise.sets.mapIndexed { sIdx, set ->
-                        if (sIdx == setIndex) {
-                            set.copy(actualWeight = weight)
-                        } else set
-                    }
-                    exercise.copy(sets = updatedSets)
-                } else exercise
-            }
-            current.copy(exercises = updatedExercises)
-        }
+        updateSet(exerciseIndex, setIndex) { it.copy(actualWeight = weight) }
     }
 
     fun updateSetReps(exerciseIndex: Int, setIndex: Int, reps: Int) {
+        updateSet(exerciseIndex, setIndex) { it.copy(actualReps = reps) }
+    }
+
+    private fun updateExercise(exerciseIndex: Int, transform: (ActiveExerciseState) -> ActiveExerciseState) {
         _activeWorkout.update { current ->
             if (current == null) return@update null
-            val updatedExercises = current.exercises.mapIndexed { eIdx, exercise ->
-                if (eIdx == exerciseIndex) {
-                    val updatedSets = exercise.sets.mapIndexed { sIdx, set ->
-                        if (sIdx == setIndex) {
-                            set.copy(actualReps = reps)
-                        } else set
-                    }
-                    exercise.copy(sets = updatedSets)
-                } else exercise
-            }
-            current.copy(exercises = updatedExercises)
+            current.copy(
+                exercises = current.exercises.mapIndexed { index, exercise ->
+                    if (index == exerciseIndex) transform(exercise) else exercise
+                }
+            )
         }
     }
+
+    private fun updateSet(exerciseIndex: Int, setIndex: Int, transform: (ExerciseSetState) -> ExerciseSetState) {
+        updateExercise(exerciseIndex) { exercise ->
+            exercise.copy(
+                sets = exercise.sets.mapIndexed { index, set ->
+                    if (index == setIndex) transform(set) else set
+                }
+            )
+        }
+    }
+
+    // ---------------------------------------------------------------- timer
 
     fun startTimer(durationSeconds: Int) {
         timerJob?.cancel()
@@ -212,8 +377,26 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         _timerSecondsRemaining.value = 0
     }
 
+    // ---------------------------------------------------------------- finishing
+
+    /**
+     * Saves the workout. A workout with no completed set is discarded instead of saved, so an
+     * accidental tap on a quick workout does not leave an empty entry in the history.
+     */
     fun finishWorkout(onSaved: () -> Unit) {
         val workout = _activeWorkout.value ?: return
+        if (isSaving) return
+        isSaving = true
+        stopTimer()
+
+        val hasCompletedSet = workout.exercises.any { exercise -> exercise.sets.any { it.isCompleted } }
+        if (!hasCompletedSet) {
+            _activeWorkout.value = null
+            isSaving = false
+            onSaved()
+            return
+        }
+
         viewModelScope.launch {
             val durationSeconds = ((System.currentTimeMillis() - workout.startTimeMillis) / 1000).coerceAtLeast(0)
 
@@ -242,14 +425,19 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
 
-            workoutDao.saveWorkout(workoutLog, setLogs)
-            _activeWorkout.value = null
-            onSaved()
+            try {
+                workoutDao.saveWorkout(workoutLog, setLogs)
+                _activeWorkout.value = null
+                onSaved()
+            } finally {
+                isSaving = false
+            }
         }
     }
 
     fun cancelWorkout() {
         stopTimer()
+        isSaving = false
         _activeWorkout.value = null
     }
 

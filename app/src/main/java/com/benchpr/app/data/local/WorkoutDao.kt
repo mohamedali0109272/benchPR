@@ -36,6 +36,14 @@ interface WorkoutDao {
     @Query("SELECT MAX(actualWeight) FROM set_logs WHERE isCompleted = 1 AND exerciseName IN ('Heavy Single', 'Bench press', 'Bench Press', 'Paused Bench')")
     fun getBestBenchLifted(): Flow<Double?>
 
+    @Query(
+        "SELECT s.actualWeight AS weight, w.unit AS unit FROM set_logs s " +
+            "INNER JOIN workout_logs w ON s.workoutLogId = w.id " +
+            "WHERE s.exerciseName = :exerciseName COLLATE NOCASE AND s.isCompleted = 1 AND s.actualWeight > 0 " +
+            "ORDER BY w.timestamp DESC, s.id DESC LIMIT 1"
+    )
+    suspend fun getLastLift(exerciseName: String): LastLift?
+
     @Query("SELECT COUNT(*) FROM workout_logs")
     fun getTotalWorkoutsCount(): Flow<Int>
 

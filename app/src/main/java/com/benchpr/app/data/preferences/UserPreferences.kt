@@ -17,6 +17,7 @@ class UserPreferences(private val context: Context) {
     companion object {
         val KEY_TARGET_1RM = doublePreferencesKey("target_1rm")
         val KEY_WEIGHT_UNIT = stringPreferencesKey("weight_unit")
+        val KEY_BODYWEIGHT_KG = doublePreferencesKey("bodyweight_kg")
     }
 
     val target1RM: Flow<Double> = context.dataStore.data.map { preferences ->
@@ -25,6 +26,17 @@ class UserPreferences(private val context: Context) {
 
     val weightUnit: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[KEY_WEIGHT_UNIT] ?: "kg"
+    }
+
+    /** Body weight is always stored in kilograms; the UI converts for display. */
+    val bodyweightKg: Flow<Double> = context.dataStore.data.map { preferences ->
+        preferences[KEY_BODYWEIGHT_KG] ?: 75.0
+    }
+
+    suspend fun updateBodyweightKg(kg: Double) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_BODYWEIGHT_KG] = kg
+        }
     }
 
     suspend fun updateTarget1RM(newTarget: Double) {
