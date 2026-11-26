@@ -5,8 +5,10 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.content.Intent
 import android.util.Log
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -16,11 +18,62 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.view.WindowCompat
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+
+    private val googleSignInClient: GoogleSignInClient by lazy {
+        GoogleSignIn.getClient(
+            this,
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestIdToken(WEB_CLIENT_ID)
+                .build(),
+        )
+    }
+
+    /** Exposed to JavaScript as window.AndroidAuth. */
+    inner class AndroidAuthBridge {
+        @JavascriptInterface
+        fun signIn() {
+            runOnUiThread {
+                startActivityForResult(googleSignInClient.signInIntent, RC_GOOGLE_SIGN_IN)
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != RC_GOOGLE_SIGN_IN) return
+
+        try {
+            val account = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException::class.java)
+            deliverGoogleResult(account.idToken, null)
+        } catch (e: ApiException) {
+            Log.w(TAG, "Google sign-in failed with status ${e.statusCode}", e)
+            deliverGoogleResult(null, "Google sign-in failed (code ${e.statusCode})")
+        }
+    }
+
+    private fun deliverGoogleResult(idToken: String?, error: String?) {
+        val tokenArg = idToken?.let { JSONObject.quote(it) } ?: "null"
+        val errorArg = error?.let { JSONObject.quote(it) } ?: "null"
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.__onNativeGoogleResult && window.__onNativeGoogleResult($tokenArg, $errorArg);",
+                null,
+            )
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +103,7 @@ class MainActivity : Activity() {
                 useWideViewPort = true
                 loadWithOverviewMode = true
             }
+            addJavascriptInterface(AndroidAuthBridge(), "AndroidAuth")
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                     if (consoleMessage != null) {
@@ -159,5 +213,9 @@ class MainActivity : Activity() {
     companion object {
         private const val TAG = "BenchPRWebView"
         private const val APP_HOST = "appassets.androidplatform.net"
+        private const val RC_GOOGLE_SIGN_IN = 9001
+        // OAuth web client ID from firebase-applet-config.json (oAuthClientId).
+        private const val WEB_CLIENT_ID =
+            "426592709819-n9ledc71i26kj3mmhqbs92k9kq8sk1ub.apps.googleusercontent.com"
     }
 }
