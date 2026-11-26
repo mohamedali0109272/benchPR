@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, UserRound } from 'lucide-react';
+import { Check, Copy, Globe, LogOut, UserRound } from 'lucide-react';
 import { GoogleGlyph } from '../components/GoogleGlyph';
-import { auth, logoutUser, onAuthStateChanged, signInWithGoogle, User } from '../services/firebase';
+import { AppUpdateCard } from '../components/AppUpdateCard';
+import { auth, isAndroidApp, logoutUser, onAuthStateChanged, openAndroidBrowserAuth, signInWithGoogle, User } from '../services/firebase';
 import { useI18n } from '../i18n/I18nContext';
 
 export const AccountScreen: React.FC = () => {
@@ -9,6 +10,7 @@ export const AccountScreen: React.FC = () => {
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedSha, setCopiedSha] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
 
@@ -100,18 +102,68 @@ export const AccountScreen: React.FC = () => {
             <span>{t('Sign Out')}</span>
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleSignIn}
-            disabled={busy}
-            className="inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-full bg-[#161B24] border border-white/15 text-[#F0F6FC] text-sm font-semibold hover:bg-[#1E2532] hover:border-white/30 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60"
-          >
-            <GoogleGlyph className="w-5 h-5" />
-            <span>{t('Sign in with Google')}</span>
-          </button>
+          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+            <button
+              type="button"
+              onClick={handleSignIn}
+              disabled={busy}
+              className="w-full inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-full bg-[#161B24] border border-white/15 text-[#F0F6FC] text-sm font-semibold hover:bg-[#1E2532] hover:border-white/30 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60"
+            >
+              <GoogleGlyph className="w-5 h-5" />
+              <span>{t('Sign in with Google')}</span>
+            </button>
+
+            {isAndroidApp() && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  openAndroidBrowserAuth();
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-[#00E5FF]/10 border border-[#00E5FF]/30 text-[#00E5FF] text-xs font-bold hover:bg-[#00E5FF]/20 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <Globe className="w-4 h-4" />
+                <span>{t('Sign in via Browser')}</span>
+              </button>
+            )}
+          </div>
         )}
 
-        {error && <p className="text-xs font-semibold text-[#FF2D55]">{error}</p>}
+        {error && (
+          <div className="w-full max-w-md rounded-xl bg-[#FF2D55]/10 border border-[#FF2D55]/30 p-3.5 text-start space-y-2">
+            <p className="text-xs font-semibold text-[#FF2D55]">{error}</p>
+            {error.includes('10') && (
+              <div className="pt-2 border-t border-[#FF2D55]/20 space-y-2 text-[11px] text-[#8B949E]">
+                <p className="text-[#F0F6FC] font-bold">
+                  {t('Android Google Error 10:')}
+                </p>
+                <p>
+                  {t('Tap "Sign in via Browser" above to authenticate directly, or add this permanent SHA-1 fingerprint to your Firebase project:')}
+                </p>
+                <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#080A0F] border border-white/10 font-mono text-[10px] text-[#F0F6FC] break-all">
+                  <span>DA:42:E9:9F:0A:B7:C7:C9:F8:30:BF:9D:2C:3F:93:AC:BA:AA:BF:26</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('DA:42:E9:9F:0A:B7:C7:C9:F8:30:BF:9D:2C:3F:93:AC:BA:AA:BF:26');
+                      setCopiedSha(true);
+                      setTimeout(() => setCopiedSha(false), 2000);
+                    }}
+                    className="p-1 rounded text-[#00E5FF] hover:bg-white/10 shrink-0 cursor-pointer"
+                    title={t('Copy SHA-1')}
+                  >
+                    {copiedSha ? <Check className="w-3.5 h-3.5 text-[#00E676]" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-extrabold tracking-wide text-[#F0F6FC]">{t('App Updates')}</h2>
+        <AppUpdateCard />
       </div>
     </div>
   );

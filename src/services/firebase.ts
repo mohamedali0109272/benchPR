@@ -21,12 +21,28 @@ const googleProvider = new GoogleAuthProvider();
 // an ID token back, which Firebase exchanges for a session.
 declare global {
   interface Window {
-    AndroidAuth?: { signIn: () => void };
+    AndroidAuth?: {
+      signIn: () => void;
+      openBrowserAuth?: () => void;
+      installUpdate?: (downloadUrl: string) => void;
+    };
     __onNativeGoogleResult?: (idToken: string | null, error: string | null) => void;
   }
 }
 
 const NATIVE_APP_HOST = 'appassets.androidplatform.net';
+
+export function isAndroidApp(): boolean {
+  return typeof window !== 'undefined' && (window.location.hostname === NATIVE_APP_HOST || !!window.AndroidAuth);
+}
+
+export function openAndroidBrowserAuth(): void {
+  if (window.AndroidAuth?.openBrowserAuth) {
+    window.AndroidAuth.openBrowserAuth();
+  } else {
+    window.open('https://ais-pre-xfm4qcf5k75dpba4xnkto3-697317136065.europe-west3.run.app/auth-popup.html', '_blank');
+  }
+}
 
 function requestNativeIdToken(): Promise<string> {
   return new Promise((resolve, reject) => {

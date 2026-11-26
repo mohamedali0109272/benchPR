@@ -17,23 +17,24 @@ android {
 
     signingConfigs {
         create("ci") {
-            // Set by CI from repository secrets. Without a fixed key, each build is signed
-            // differently and installed copies cannot be updated.
             val keystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
+            } else if (file("debug.keystore").exists()) {
+                storeFile = file("debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
     }
 
     buildTypes {
         debug {
-            if (System.getenv("KEYSTORE_PATH")?.isNotBlank() == true) {
-                signingConfig = signingConfigs.getByName("ci")
-            }
+            signingConfig = signingConfigs.getByName("ci")
         }
         release {
             isMinifyEnabled = false

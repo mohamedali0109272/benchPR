@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Globe, X } from 'lucide-react';
+import { AppUpdateCard } from './AppUpdateCard';
 import { useI18n } from '../i18n/I18nContext';
 
 interface SideMenuProps {
@@ -35,7 +36,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ open, onClose, onOpenLanguag
         role="dialog"
         aria-modal="true"
         aria-label={t('Settings')}
-        className={`absolute top-0 bottom-0 end-0 w-72 max-w-[85vw] bg-[#0D1119] border-s border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ${
+        className={`absolute top-0 bottom-0 end-0 w-80 max-w-[88vw] bg-[#0D1119] border-s border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ${
           open ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'
         }`}
       >
@@ -51,7 +52,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({ open, onClose, onOpenLanguag
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-5 p-5 overflow-y-auto flex-1">
           <section className="flex flex-col gap-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-[#6E7681]">{t('Preferences')}</p>
             <button
@@ -62,6 +63,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({ open, onClose, onOpenLanguag
               <Globe className="w-4 h-4" />
               <span>{t('Language')}</span>
             </button>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#6E7681]">{t('Updates')}</p>
+            <AppUpdateCard compact />
           </section>
         </div>
       </aside>

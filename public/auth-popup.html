@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BenchPR - Google Sign-in</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background-color: #080A0F;
+      color: #F0F6FC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      text-align: center;
+    }
+    .card {
+      background: #131822;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 32px 24px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #FF2D55, #FF6B8B);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-weight: 900;
+      font-size: 20px;
+      color: #080A0F;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    p {
+      margin: 0 0 24px;
+      font-size: 13px;
+      color: #8B949E;
+      line-height: 1.5;
+    }
+    button {
+      background: #FF2D55;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #00E676;
+    }
+    .error {
+      color: #FF2D55;
+    }
+    .manual-link {
+      display: none;
+      margin-top: 16px;
+      color: #00E5FF;
+      font-size: 13px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDcXU6ey5M5kdX-3RrjcwLtj8NTsYS3h5w",
+      authDomain: "gen-lang-client-0831504004.firebaseapp.com",
+      projectId: "gen-lang-client-0831504004",
+      storageBucket: "gen-lang-client-0831504004.firebasestorage.app",
+      messagingSenderId: "426592709819",
+      appId: "1:426592709819:web:59b0bced4e0fa97e020d9e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const btn = document.getElementById('signInBtn');
+    const status = document.getElementById('status');
+    const manualLink = document.getElementById('manualLink');
+
+    async function doSignIn() {
+      btn.disabled = true;
+      status.textContent = "Connecting to Google...";
+      status.className = "status";
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const idToken = await result.user.getIdToken();
+        status.textContent = "Sign-in successful! Returning to BenchPR...";
+        const returnUrl = "benchpr://auth?idToken=" + encodeURIComponent(idToken);
+        manualLink.href = returnUrl;
+        manualLink.style.display = "inline-block";
+        window.location.href = returnUrl;
+      } catch (err) {
+        console.error(err);
+        btn.disabled = false;
+        status.textContent = err.message || "Failed to sign in.";
+        status.className = "status error";
+      }
+    }
+
+    btn.addEventListener('click', doSignIn);
+    // Auto-trigger on mobile browser load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(doSignIn, 400);
+    });
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">PR</div>
+    <h1>BenchPR Tracker</h1>
+    <p>Sign in with your Google Account to sync workouts and PRs across all your devices.</p>
+    <button id="signInBtn">Continue with Google</button>
+    <div id="status" class="status"></div>
+    <a id="manualLink" class="manual-link">Open BenchPR App</a>
+  </div>
+</body>
+</html>

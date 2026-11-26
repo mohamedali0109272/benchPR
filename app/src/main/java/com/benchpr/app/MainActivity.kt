@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -45,8 +46,62 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun signIn() {
             runOnUiThread {
-                startActivityForResult(googleSignInClient.signInIntent, RC_GOOGLE_SIGN_IN)
+                try {
+                    startActivityForResult(googleSignInClient.signInIntent, RC_GOOGLE_SIGN_IN)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Native sign-in start failed, falling back to browser", e)
+                    launchBrowserAuth()
+                }
             }
+        }
+
+        @JavascriptInterface
+        fun openBrowserAuth() {
+            runOnUiThread {
+                launchBrowserAuth()
+            }
+        }
+
+        @JavascriptInterface
+        fun installUpdate(downloadUrl: String) {
+            runOnUiThread {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start install update", e)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleAuthIntent(intent)
+    }
+
+    private fun handleAuthIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "benchpr" && data.host == "auth") {
+            val idToken = data.getQueryParameter("idToken")
+            val error = data.getQueryParameter("error")
+            Log.d(TAG, "Received deep link auth: hasToken=${idToken != null}, error=$error")
+            deliverGoogleResult(idToken, error)
+        }
+    }
+
+    private fun launchBrowserAuth() {
+        try {
+            val authUrl = "https://ais-pre-xfm4qcf5k75dpba4xnkto3-697317136065.europe-west3.run.app/auth-popup.html"
+            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(browserIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch browser auth", e)
+            deliverGoogleResult(null, "Could not open browser for sign-in")
         }
     }
 
@@ -62,8 +117,12 @@ class MainActivity : Activity() {
             Log.w(TAG, "Google sign-in failed with status ${e.statusCode}", e)
             if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
                 deliverGoogleResult(null, "CANCELLED")
+            } else if (e.statusCode == 10) {
+                // 10 = DEVELOPER_ERROR: SHA-1 is not registered in Firebase console.
+                // Automatically fall back to browser-based OAuth so the user signs in seamlessly!
+                Log.i(TAG, "Error 10 encountered: SHA-1 not registered. Falling back to browser OAuth...")
+                launchBrowserAuth()
             } else {
-                // 10 = DEVELOPER_ERROR: the app's SHA-1 is not registered for this OAuth client.
                 deliverGoogleResult(null, "Google error ${e.statusCode}")
             }
             return
@@ -71,8 +130,8 @@ class MainActivity : Activity() {
 
         val token = account.idToken
         if (token == null) {
-            Log.e(TAG, "Google account returned no ID token; check the Web client ID")
-            deliverGoogleResult(null, "No ID token (check Web client ID)")
+            Log.e(TAG, "Google account returned no ID token; falling back to browser")
+            launchBrowserAuth()
         } else {
             deliverGoogleResult(token, null)
         }
@@ -92,6 +151,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleAuthIntent(intent)
 
         val bgColor = Color.parseColor("#080A0F")
         window.setBackgroundDrawable(ColorDrawable(bgColor))
