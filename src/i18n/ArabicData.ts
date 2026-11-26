@@ -324,4 +324,8 @@ export const uiStrings: Record<string, string> = {
   day: 'يوم',
   'Enter your goal single rep max (1RM) targets for Bench, Squat, and Deadlift.':
     'أدخل أهدافك لأقصى وزن لتكرار واحد (1RM) للبنش والسكوات والديدلفت.',
+  'Search by name or target muscle...': 'ابحث بالاسم أو العضلة المستهدفة...',
+  'Clear search': 'مسح البحث',
+  'Reset filters': 'إعادة ضبط الفلاتر',
+  exercises: 'تمارين',
 };

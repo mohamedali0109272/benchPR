@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Dumbbell, Play, Search } from 'lucide-react';
+import { Dumbbell, Play, Search, X } from 'lucide-react';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { useI18n } from '../i18n/I18nContext';
 import { ALL_MUSCLE_GROUPS, ExerciseItem, MUSCLE_DISPLAY_NAMES, MuscleGroup } from '../types/models';
@@ -30,18 +30,23 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
 
   const filteredExercises = useMemo(
-    () => ExerciseLibrary.search(searchQuery, selectedMuscle),
-    [searchQuery, selectedMuscle],
+    () => ExerciseLibrary.search(searchQuery, selectedMuscle, t),
+    [searchQuery, selectedMuscle, t],
   );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
       {/* Title */}
-      <div className="flex items-center gap-2.5 animate-enter">
-        <Dumbbell className="w-6 h-6 text-[#FF6D00]" />
-        <h1 className="text-xl font-black tracking-wide text-[#F0F6FC]">
-          {t('EXERCISE LIBRARY')}
-        </h1>
+      <div className="flex items-center justify-between gap-3 animate-enter">
+        <div className="flex items-center gap-2.5">
+          <Dumbbell className="w-6 h-6 text-[#FF6D00]" />
+          <h1 className="text-xl font-black tracking-wide text-[#F0F6FC]">
+            {t('EXERCISE LIBRARY')}
+          </h1>
+        </div>
+        <span className="px-2.5 py-1 rounded-lg bg-[#131822] border border-white/10 text-xs font-bold font-mono-num text-[#8B949E]">
+          {filteredExercises.length} {t('exercises')}
+        </span>
       </div>
 
       {/* Search Bar */}
@@ -51,9 +56,20 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t('Search exercises...')}
-          className="w-full ps-11 pe-4 py-3 rounded-xl bg-[#131822] border border-white/10 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF6D00] transition-colors"
+          placeholder={t('Search by name or target muscle...')}
+          aria-label={t('Search by name or target muscle...')}
+          className="w-full ps-11 pe-10 py-3 rounded-xl bg-[#131822] border border-white/10 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF6D00] transition-colors"
         />
+        {searchQuery.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            aria-label={t('Clear search')}
+            className="w-7 h-7 rounded-lg absolute top-1/2 -translate-y-1/2 end-2.5 flex items-center justify-center text-[#8B949E] hover:text-[#F0F6FC] hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Filter Chips */}
@@ -100,8 +116,20 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
 
       {/* Exercise Cards */}
       {filteredExercises.length === 0 ? (
-        <div className="py-16 text-center text-sm text-[#8B949E]">
-          {t('No exercises match your search.')}
+        <div className="py-16 text-center space-y-3">
+          <div className="text-sm text-[#8B949E]">{t('No exercises match your search.')}</div>
+          {(searchQuery.length > 0 || selectedMuscle !== null) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedMuscle(null);
+              }}
+              className="px-4 py-2 rounded-xl bg-[#131822] border border-white/10 text-xs font-bold text-[#00E5FF] hover:border-[#00E5FF]/50 transition-colors cursor-pointer"
+            >
+              {t('Reset filters')}
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

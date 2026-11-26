@@ -1,4 +1,4 @@
-import { ExerciseItem, MuscleGroup } from '../types/models';
+import { ExerciseItem, MUSCLE_DISPLAY_NAMES, MuscleGroup } from '../types/models';
 
 const ex = (
   id: string,
@@ -159,15 +159,35 @@ export const ExerciseLibrary = {
   getByMuscle(muscleGroup: MuscleGroup): ExerciseItem[] {
     return PRESET_EXERCISES.filter((item) => item.muscleGroup === muscleGroup);
   },
-  search(query: string, muscle: MuscleGroup | null = null): ExerciseItem[] {
+  search(
+    query: string,
+    muscle: MuscleGroup | null = null,
+    translate?: (text: string) => string,
+  ): ExerciseItem[] {
     const q = query.trim().toLowerCase();
     return PRESET_EXERCISES.filter((item) => {
       const matchesMuscle = muscle === null || item.muscleGroup === muscle;
-      const matchesQuery =
-        q.length === 0 ||
-        item.name.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q);
-      return matchesMuscle && matchesQuery;
+      if (!matchesMuscle) return false;
+      if (q.length === 0) return true;
+
+      const primaryMuscleName = MUSCLE_DISPLAY_NAMES[item.muscleGroup];
+      const candidates = [
+        item.name,
+        item.description,
+        primaryMuscleName,
+        ...item.secondaryMuscles.map((m) => MUSCLE_DISPLAY_NAMES[m]),
+      ];
+
+      if (translate) {
+        candidates.push(
+          translate(item.name),
+          translate(item.description),
+          translate(primaryMuscleName),
+          ...item.secondaryMuscles.map((m) => translate(MUSCLE_DISPLAY_NAMES[m])),
+        );
+      }
+
+      return candidates.some((c) => c.toLowerCase().includes(q));
     });
   },
 };

@@ -19,7 +19,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
   const [query, setQuery] = useState('');
   const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
 
-  const results = useMemo(() => ExerciseLibrary.search(query, muscle), [query, muscle]);
+  const results = useMemo(() => ExerciseLibrary.search(query, muscle, t), [query, muscle, t]);
 
   return (
     <div
