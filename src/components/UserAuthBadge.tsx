@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
 import { auth, signInWithGoogle, logoutUser, onAuthStateChanged, User } from '../services/firebase';
 import { useI18n } from '../i18n/I18nContext';
 
