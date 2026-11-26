@@ -11,8 +11,10 @@ import {
   Timer,
   X,
 } from 'lucide-react';
+import { ExerciseArt } from '../components/ExerciseArt';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
 import { useWorkout } from '../context/WorkoutContext';
+import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { formatPlainWeight } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
 import {
@@ -349,9 +351,12 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
     >
       {/* Card Header */}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-base sm:text-lg font-bold text-[#F0F6FC]">{t(template.name)}</h3>
-          <p className="text-xs font-semibold text-[#00E5FF] mt-0.5">{t(descStr)}</p>
+        <div className="min-w-0 flex items-center gap-3">
+          <ExerciseArt exerciseId={ExerciseLibrary.findByName(template.name)?.id} className="w-14 h-14" />
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-[#F0F6FC]">{t(template.name)}</h3>
+            <p className="text-xs font-semibold text-[#00E5FF] mt-0.5">{t(descStr)}</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">

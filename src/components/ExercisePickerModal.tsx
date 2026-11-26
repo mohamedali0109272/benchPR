@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { ExerciseArt } from './ExerciseArt';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { useI18n } from '../i18n/I18nContext';
 import { ALL_MUSCLE_GROUPS, ExerciseItem, MUSCLE_DISPLAY_NAMES, MuscleGroup } from '../types/models';
@@ -107,9 +108,12 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                   }}
                   className="w-full text-start flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#161B24] border border-white/10 hover:border-[#FF2D55]/60 hover:bg-[#1B222E] active:scale-[0.99] transition-all cursor-pointer"
                 >
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-[#F0F6FC] truncate">{t(item.name)}</div>
-                    <div className="text-xs text-[#8B949E] mt-0.5">{t(subtitle)}</div>
+                  <div className="min-w-0 flex items-center gap-3">
+                    <ExerciseArt exerciseId={item.id} className="w-11 h-11" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-[#F0F6FC] truncate">{t(item.name)}</div>
+                      <div className="text-xs text-[#8B949E] mt-0.5">{t(subtitle)}</div>
+                    </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-md bg-[#00E5FF]/10 text-[#00E5FF] text-[11px] font-bold whitespace-nowrap shrink-0">
                     {t(MUSCLE_DISPLAY_NAMES[item.muscleGroup])}

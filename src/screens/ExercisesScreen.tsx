@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Play, Search, X } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { exerciseIcon } from '../data/exerciseIcons';
+import { ExerciseArt } from '../components/ExerciseArt';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { useI18n } from '../i18n/I18nContext';
 import { ALL_MUSCLE_GROUPS, ExerciseItem, MUSCLE_DISPLAY_NAMES, MuscleGroup } from '../types/models';
@@ -159,7 +159,6 @@ interface ExerciseCardProps {
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, accent, index, onStart }) => {
   const { t } = useI18n();
-  const Icon = exerciseIcon(exercise.id);
 
   return (
     <div
@@ -173,12 +172,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, accent, index, on
 
       <div className="relative">
         <div className="flex items-start gap-3">
-          <span
-            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border"
-            style={{ backgroundColor: `${accent}1A`, borderColor: `${accent}55`, color: accent }}
-          >
-            <Icon className="w-5 h-5" />
-          </span>
+          <ExerciseArt exerciseId={exercise.id} accent={accent} className="w-16 h-16" />
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-[#F0F6FC] leading-snug">{t(exercise.name)}</h3>
             <span

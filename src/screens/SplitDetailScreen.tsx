@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ChevronDown, Play } from 'lucide-react';
+import { ExerciseArt } from '../components/ExerciseArt';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { Splits } from '../data/Splits';
 import { useI18n } from '../i18n/I18nContext';
@@ -145,15 +146,18 @@ const DayCard: React.FC<DayCardProps> = ({
                   key={`${entry.exerciseId}-${idx}`}
                   className="flex items-center justify-between gap-3 py-2 border-b border-white/[0.04] last:border-b-0"
                 >
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-[#F0F6FC]">
-                      {item ? t(item.name) : entry.exerciseId}
-                    </div>
-                    {item && (
-                      <div className="text-[11px] font-semibold text-[#00E5FF]">
-                        {t(MUSCLE_DISPLAY_NAMES[item.muscleGroup])}
+                  <div className="min-w-0 flex items-center gap-3">
+                    <ExerciseArt exerciseId={entry.exerciseId} className="w-10 h-10" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#F0F6FC]">
+                        {item ? t(item.name) : entry.exerciseId}
                       </div>
-                    )}
+                      {item && (
+                        <div className="text-[11px] font-semibold text-[#00E5FF]">
+                          {t(MUSCLE_DISPLAY_NAMES[item.muscleGroup])}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span className="text-xs font-bold font-mono-num text-[#8B949E] whitespace-nowrap shrink-0">
                     {t(`${entry.sets} x ${entry.repRange}`)}
