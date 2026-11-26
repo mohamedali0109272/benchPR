@@ -195,17 +195,6 @@ export const dayFocus: Record<string, string> = {
 };
 
 export const uiStrings: Record<string, string> = {
-  App: 'التطبيق',
-  Version: 'الإصدار',
-  'Check for updates': 'البحث عن تحديثات',
-  'Checking for updates…': 'جارٍ البحث عن تحديثات…',
-  'You are up to date.': 'أنت تستخدم أحدث إصدار.',
-  'Update available': 'يوجد تحديث جديد',
-  'Install update': 'تثبيت التحديث',
-  'Downloading update…': 'جارٍ تنزيل التحديث…',
-  'Confirm the install on the next screen.': 'أكّد التثبيت في الشاشة التالية.',
-  'Allow BenchPR to install apps, then tap Install update again.': 'اسمح لـ BenchPR بتثبيت التطبيقات، ثم اضغط تثبيت التحديث مرة أخرى.',
-  'Updates are available in the Android app only.': 'التحديثات متاحة في تطبيق أندرويد فقط.',
   Account: 'الحساب',
   'Sign in with Google': 'تسجيل الدخول بحساب Google',
   'Sign Out': 'تسجيل الخروج',
