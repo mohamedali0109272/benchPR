@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and target PRs",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "targetBench": { "type": "number" },
+        "targetSquat": { "type": "number" },
+        "targetDeadlift": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Workout": {
+      "title": "Workout",
+      "description": "Logged workout sessions",
+      "type": "object",
+      "properties": {
+        "workoutId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "date": { "type": "string" },
+        "exercises": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "duration": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["workoutId", "userId", "date", "exercises"]
+    },
+    "CustomExercise": {
+      "title": "CustomExercise",
+      "description": "Custom exercises added by user",
+      "type": "object",
+      "properties": {
+        "exerciseId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 128 },
+        "muscleGroup": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["exerciseId", "userId", "name", "muscleGroup"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "UserProfile" },
+      "description": "User profile data"
+    },
+    "/workouts/{workoutId}": {
+      "schema": { "$ref": "Workout" },
+      "description": "User workouts collection"
+    },
+    "/customExercises/{exerciseId}": {
+      "schema": { "$ref": "CustomExercise" },
+      "description": "User custom exercises collection"
+    }
+  }
+}

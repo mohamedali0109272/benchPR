@@ -1,21 +1,47 @@
-# BenchPR Tracker (React Web App)
+# BenchPR Tracker (React Web App & Android Wrapper)
 
-A modern, vibrant, animated React + TypeScript + Tailwind CSS web application rewritten from the Android BenchPR app.
+A professional, high-performance strength training and powerlifting tracker featuring a sleek dark-mode aesthetic with vibrant red accents (`#FF2D55`), Google Authentication, real-time Firestore cloud sync, 1RM trend charts, workout calendar streaks, and comprehensive lifting accessories support (Belt, Wrist Wraps, Elbow Wraps, Knee Wraps, Knee Sleeves, Lifting Straps, and Chalk).
 
-## Features
+## App Screenshots
 
-- **Bench PR Program**: 3 structured bench press sessions (Heavy/Strength, Volume/Muscle, Technique/Speed) with automatic plate-rounded weight scaling (`kg` / `lbs`) based on your Target 1RM.
-- **Quick Start & Freestyle Logging**: Start an empty workout or jump straight into any of the 61 preset exercises.
+### Dashboard & Analytics
+![Dashboard Preview](app/src/main/res/drawable/benchpr_hero_mockup_1795704123624.jpg)
+
+### Active Workout Session & Gear Logging
+![Session Preview](app/src/main/res/drawable/benchpr_session_mockup_1795704135317.jpg)
+
+## Key Features
+
+- **Google Authentication & Cloud Persistence**: Sign in securely with your Google account to automatically record and sync all your workouts, preferences, and target PRs across sessions and devices via Firebase Firestore.
+- **Target PRs (1RM)**: Manage your 1RM goals for **Bench Press**, **Squat**, and **Deadlift** with combined Target Total calculation, circular progress rings, and quick PR editor modals.
+- **Lifting Accessories & Gear Support**: Attach any combination of lifting gear (*Belt*, *Wrist Wraps*, *Elbow Wraps*, *Knee Wraps*, *Knee Sleeves*, *Lifting Straps*, and *Chalk*) to each individual set.
+- **30-Day Estimated 1RM Trend Charts**: Powered by Recharts with lift toggles, interactive tooltips, and time-to-target 1RM ETAs.
+- **Workout Calendar & Training Streaks**: Interactive monthly calendar view highlighting training days, monthly active frequency, and workout streak tracking.
 - **Training Splits**: 9 complete splits (PPL, Upper/Lower, Full Body, Bro Split, Arnold Split, PHUL, PPL + UL, 5x5) with expandable day breakdowns.
-- **Interactive Muscle Ranks & Body Model**: Strength ranking engine comparing your completed lifts against bodyweight across 13 muscle groups and 9 rank tiers (Unranked through Legend), with an interactive Front/Back SVG anatomical model.
-- **Exercise Library**: Searchable, muscle-filterable library of 61 exercises.
-- **Active Workout Studio**: Live set logging, last-lift weight prefill, add/remove sets & exercises, and a countdown Static Hold timer.
-- **Workout History**: Expandable session logs with date, duration, target 1RM, and deletion.
+- **Interactive Muscle Ranks & Body Model**: Strength ranking engine comparing completed lifts against bodyweight across 13 muscle groups and 9 rank tiers (Unranked through Legend).
+- **Exercise Library with Search**: Searchable, muscle-filterable exercise library with custom exercise creation.
 - **Bilingual Support (English & Arabic RTL)**: Full English and Arabic translation engine with automatic RTL layout switching.
+- **Automated GitHub Actions Releases**: CI/CD workflow that automatically builds web assets, compiles Android debug APKs, and publishes GitHub releases on pushes to `main`.
 
-## Development
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Lucide Icons, Recharts.
+- **Backend & Auth**: Firebase Authentication (Google Sign-In) & Cloud Firestore.
+- **Mobile Packaging**: Android Gradle Plugin & System WebView wrapper.
+
+## Development & Local Setup
 
 ```bash
+# Install dependencies
 npm install
+
+# Run development server
 npm run dev
+
+# Build production assets
+npm run build
 ```
+
+## License
+
+MIT License. Created for powerlifters and serious strength athletes.

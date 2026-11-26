@@ -6,6 +6,7 @@ import {
   Minus,
   Play,
   Plus,
+  Shield,
   Square,
   Timer,
   X,
@@ -14,7 +15,13 @@ import { ExercisePickerModal } from '../components/ExercisePickerModal';
 import { useWorkout } from '../context/WorkoutContext';
 import { formatPlainWeight } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
-import { ActiveExerciseState, ExerciseSetState, WeightUnit } from '../types/models';
+import {
+  ActiveExerciseState,
+  ALL_LIFTING_ACCESSORIES,
+  ExerciseSetState,
+  LiftingAccessory,
+  WeightUnit,
+} from '../types/models';
 
 interface SessionScreenProps {
   onWorkoutFinished: () => void;
@@ -33,6 +40,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
     toggleSetCompletion,
     updateSetWeight,
     updateSetReps,
+    toggleSetAccessory,
     startTimer,
     stopTimer,
     addSet,
@@ -89,7 +97,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
               <h1 className="text-sm sm:text-base font-extrabold text-[#F0F6FC] truncate">
                 {t(activeWorkout.sessionTemplate.title)}
               </h1>
-              <p className="text-xs font-semibold text-[#FF9E40] truncate">
+              <p className="text-xs font-semibold text-[#FF2D55] truncate">
                 {t(`Goal: ${activeWorkout.sessionTemplate.goal}`)}
               </p>
             </div>
@@ -116,7 +124,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
           </div>
           <div className="h-2 rounded-full bg-[#1E2532] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#FF6D00] via-[#00E5FF] to-[#00E676] transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-[#FF2D55] via-[#00E5FF] to-[#00E676] transition-all duration-500 ease-out"
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
@@ -152,6 +160,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
               onToggleSet={(sIdx) => toggleSetCompletion(eIdx, sIdx)}
               onUpdateWeight={(sIdx, w) => updateSetWeight(eIdx, sIdx, w)}
               onUpdateReps={(sIdx, r) => updateSetReps(eIdx, sIdx, r)}
+              onToggleAccessory={(sIdx, acc) => toggleSetAccessory(eIdx, sIdx, acc)}
               onStartHoldTimer={(duration) => startTimer(duration)}
               onAddSet={() => addSet(eIdx)}
               onRemoveSet={() => removeSet(eIdx, exerciseState.sets.length - 1)}
@@ -164,7 +173,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
         <button
           type="button"
           onClick={() => setShowPicker(true)}
-          className="w-full h-12 rounded-xl border border-[#FF6D00]/70 bg-[#FF6D00]/10 text-[#FF9E40] font-black text-xs tracking-wider flex items-center justify-center gap-2 hover:bg-[#FF6D00]/20 active:scale-[0.985] transition-all cursor-pointer"
+          className="w-full h-12 rounded-xl border border-[#FF2D55]/70 bg-[#FF2D55]/10 text-[#FF6B8B] font-black text-xs tracking-wider flex items-center justify-center gap-2 hover:bg-[#FF2D55]/20 active:scale-[0.985] transition-all cursor-pointer"
         >
           <Plus className="w-5 h-5" />
           <span>{t('ADD EXERCISE')}</span>
@@ -221,7 +230,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
                   cancelWorkout();
                   onBackClick();
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-[#FF2D6F]/20 text-[#FF2D6F] hover:bg-[#FF2D6F]/30 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-[#FF2D55]/20 text-[#FF2D55] hover:bg-[#FF2D55]/30 cursor-pointer"
               >
                 {t('Discard')}
               </button>
@@ -253,20 +262,20 @@ const TimerCard: React.FC<TimerCardProps> = ({
   const ratio = totalSeconds > 0 ? secondsRemaining / totalSeconds : 0;
 
   return (
-    <div className="rounded-2xl bg-[#1A202D] border border-[#FF6D00] p-4 flex items-center justify-between gap-4 shadow-[0_0_28px_rgba(255,109,0,0.2)] animate-enter">
+    <div className="rounded-2xl bg-[#1A202D] border border-[#FF2D55] p-4 flex items-center justify-between gap-4 shadow-[0_0_28px_rgba(255,45,85,0.2)] animate-enter">
       <div className="flex items-center gap-3.5">
-        <div className="w-11 h-11 rounded-xl bg-[#FF6D00]/15 flex items-center justify-center text-[#FF6D00]">
+        <div className="w-11 h-11 rounded-xl bg-[#FF2D55]/15 flex items-center justify-center text-[#FF2D55]">
           <Timer className={`w-6 h-6 ${isRunning ? 'animate-bench-pulse' : ''}`} />
         </div>
         <div>
-          <div className="text-[11px] font-extrabold tracking-widest text-[#FF9E40]">
+          <div className="text-[11px] font-extrabold tracking-widest text-[#FF6B8B]">
             {t(isRunning ? 'STATIC HOLD TIMER RUNNING' : 'TIMER PAUSED')}
           </div>
           <div className="text-2xl font-black font-mono-num text-[#F0F6FC]">{formatted}</div>
           {totalSeconds > 0 && (
             <div className="mt-1 w-32 h-1 rounded-full bg-white/10 overflow-hidden">
               <div
-                className="h-full bg-[#FF6D00] transition-all duration-300"
+                className="h-full bg-[#FF2D55] transition-all duration-300"
                 style={{ width: `${Math.round(ratio * 100)}%` }}
               />
             </div>
@@ -278,7 +287,7 @@ const TimerCard: React.FC<TimerCardProps> = ({
         type="button"
         onClick={onStopClick}
         aria-label="Stop Timer"
-        className="w-10 h-10 rounded-full bg-[#FF6D00] text-[#080A0F] flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+        className="w-10 h-10 rounded-full bg-[#FF2D55] text-[#080A0F] flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer"
       >
         <Square className="w-4 h-4 fill-current" />
       </button>
@@ -292,6 +301,7 @@ interface ExerciseLoggingCardProps {
   onToggleSet: (setIndex: number) => void;
   onUpdateWeight: (setIndex: number, weight: number) => void;
   onUpdateReps: (setIndex: number, reps: number) => void;
+  onToggleAccessory: (setIndex: number, accessory: LiftingAccessory) => void;
   onStartHoldTimer: (duration: number) => void;
   onAddSet: () => void;
   onRemoveSet: () => void;
@@ -304,6 +314,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
   onToggleSet,
   onUpdateWeight,
   onUpdateReps,
+  onToggleAccessory,
   onStartHoldTimer,
   onAddSet,
   onRemoveSet,
@@ -348,7 +359,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
             <button
               type="button"
               onClick={() => onStartHoldTimer(template.targetDurationSeconds)}
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#FF6D00] to-[#FF9E40] text-[#080A0F] font-bold text-xs flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#FF2D55] to-[#FF6B8B] text-[#080A0F] font-bold text-xs flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>{t(`${template.targetDurationSeconds}s Hold`)}</span>
@@ -358,7 +369,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
             type="button"
             onClick={onRemoveExercise}
             aria-label="Remove exercise"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6E7681] hover:text-[#FF2D6F] hover:bg-[#FF2D6F]/10 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6E7681] hover:text-[#FF2D55] hover:bg-[#FF2D55]/10 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -366,7 +377,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
       </div>
 
       {/* Sets */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-3">
         {sets.map((set, setIndex) => (
           <SetLoggingRow
             key={set.setIndex}
@@ -377,12 +388,13 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
             onToggle={() => onToggleSet(setIndex)}
             onWeightChange={(w) => onUpdateWeight(setIndex, w)}
             onRepsChange={(r) => onUpdateReps(setIndex, r)}
+            onToggleAccessory={(acc) => onToggleAccessory(setIndex, acc)}
           />
         ))}
       </div>
 
       {/* Set Actions */}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
           onClick={onAddSet}
@@ -396,7 +408,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
           <button
             type="button"
             onClick={onRemoveSet}
-            className="flex-1 py-2.5 rounded-xl bg-[#1A2130] border border-white/10 text-xs font-bold tracking-wide text-[#8B949E] flex items-center justify-center gap-1.5 hover:text-[#FF2D6F] hover:bg-[#222B3E] active:scale-[0.98] transition-all cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl bg-[#1A2130] border border-white/10 text-xs font-bold tracking-wide text-[#8B949E] flex items-center justify-center gap-1.5 hover:text-[#FF2D55] hover:bg-[#222B3E] active:scale-[0.98] transition-all cursor-pointer"
           >
             <Minus className="w-4 h-4" />
             <span>{t('REMOVE SET')}</span>
@@ -415,6 +427,7 @@ interface SetLoggingRowProps {
   onToggle: () => void;
   onWeightChange: (weight: number) => void;
   onRepsChange: (reps: number) => void;
+  onToggleAccessory: (accessory: LiftingAccessory) => void;
 }
 
 const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
@@ -425,11 +438,13 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
   onToggle,
   onWeightChange,
   onRepsChange,
+  onToggleAccessory,
 }) => {
   const { t } = useI18n();
   const [weightText, setWeightText] = useState(formatPlainWeight(set.actualWeight));
   const [repsText, setRepsText] = useState(String(set.actualReps));
   const [lastSyncedWeight, setLastSyncedWeight] = useState(set.actualWeight);
+  const [showAccessoriesMenu, setShowAccessoriesMenu] = useState(false);
 
   if (set.actualWeight !== lastSyncedWeight) {
     setLastSyncedWeight(set.actualWeight);
@@ -438,90 +453,164 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
     }
   }
 
+  const activeAccessories = set.accessories ?? [];
+
   return (
     <div
-      onClick={onToggle}
-      className={`flex items-center justify-between gap-2 sm:gap-4 px-3 py-2.5 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+      className={`rounded-xl border transition-all duration-200 overflow-hidden ${
         set.isCompleted
-          ? 'bg-[#00E676]/10 border-[#00E676]/60 animate-pop'
+          ? 'bg-[#00E676]/10 border-[#00E676]/60'
           : 'bg-[#0C0F16] border-white/10 hover:border-white/20'
       }`}
     >
-      <div className="flex items-center gap-2.5 shrink-0">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          aria-label={t(`SET ${setNumber}`)}
-          className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all cursor-pointer ${
-            set.isCompleted
-              ? 'bg-[#00E676] border-[#00E676] text-[#080A0F]'
-              : 'border-[#484F58] bg-transparent hover:border-[#00E676]/60'
-          }`}
-        >
-          {set.isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
-        </button>
-
-        <span
-          className={`text-xs font-extrabold tracking-wide whitespace-nowrap ${
-            set.isCompleted ? 'text-[#00E676]' : 'text-[#8B949E]'
-          }`}
-        >
-          {t(`SET ${setNumber}`)}
-        </span>
-      </div>
-
       <div
-        className="flex items-center gap-2"
-        onClick={(e) => e.stopPropagation()}
+        onClick={onToggle}
+        className="flex items-center justify-between gap-2 sm:gap-4 px-3 py-2.5 cursor-pointer select-none"
       >
-        <div className="relative flex items-center">
-          <input
-            type="number"
-            step="0.5"
-            min="0"
-            value={weightText}
-            onChange={(e) => {
-              const str = e.target.value;
-              setWeightText(str);
-              const parsed = parseFloat(str.replace(',', '.'));
-              if (Number.isFinite(parsed)) {
-                setLastSyncedWeight(parsed);
-                onWeightChange(parsed);
-              }
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
             }}
-            className="w-20 sm:w-24 ps-2.5 pe-7 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF6D00]"
-          />
-          <span className="absolute end-2 text-[10px] font-bold text-[#6E7681] pointer-events-none">
-            {t(unit)}
+            aria-label={t(`SET ${setNumber}`)}
+            className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all cursor-pointer ${
+              set.isCompleted
+                ? 'bg-[#00E676] border-[#00E676] text-[#080A0F]'
+                : 'border-[#484F58] bg-transparent hover:border-[#00E676]/60'
+            }`}
+          >
+            {set.isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
+          </button>
+
+          <span
+            className={`text-xs font-extrabold tracking-wide whitespace-nowrap ${
+              set.isCompleted ? 'text-[#00E676]' : 'text-[#8B949E]'
+            }`}
+          >
+            {t(`SET ${setNumber}`)}
           </span>
+
+          {/* Accessory summary pill if any selected */}
+          {activeAccessories.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAccessoriesMenu(!showAccessoriesMenu);
+              }}
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FF2D55]/15 border border-[#FF2D55]/40 text-[10px] font-bold text-[#FF2D55] cursor-pointer"
+            >
+              <Shield className="w-3 h-3" />
+              <span>{activeAccessories.join(', ')}</span>
+            </button>
+          )}
         </div>
 
-        <span className="text-xs font-bold text-[#6E7681]">×</span>
+        <div
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => setShowAccessoriesMenu(!showAccessoriesMenu)}
+            title={t('Toggle Lifting Accessories')}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              activeAccessories.length > 0
+                ? 'bg-[#FF2D55]/20 border-[#FF2D55] text-[#FF2D55]'
+                : 'bg-[#161B24] border-white/10 text-[#8B949E] hover:text-[#F0F6FC]'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+          </button>
 
-        {isStaticHold ? (
-          <div className="w-16 sm:w-20 px-2.5 py-1.5 rounded-lg bg-[#161B24]/60 border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] text-center">
-            {t(`${set.durationSeconds}s`)}
+          <div className="relative flex items-center">
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={weightText}
+              onChange={(e) => {
+                const str = e.target.value;
+                setWeightText(str);
+                const parsed = parseFloat(str.replace(',', '.'));
+                if (Number.isFinite(parsed)) {
+                  setLastSyncedWeight(parsed);
+                  onWeightChange(parsed);
+                }
+              }}
+              className="w-20 sm:w-24 ps-2.5 pe-7 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF2D55]"
+            />
+            <span className="absolute end-2 text-[10px] font-bold text-[#6E7681] pointer-events-none">
+              {t(unit)}
+            </span>
           </div>
-        ) : (
-          <input
-            type="number"
-            min="0"
-            value={repsText}
-            onChange={(e) => {
-              const str = e.target.value;
-              setRepsText(str);
-              const parsed = parseInt(str, 10);
-              if (Number.isFinite(parsed)) {
-                onRepsChange(parsed);
-              }
-            }}
-            className="w-16 sm:w-20 px-2.5 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#FF6D00]"
-          />
-        )}
+
+          <span className="text-xs font-bold text-[#6E7681]">×</span>
+
+          {isStaticHold ? (
+            <div className="w-16 sm:w-20 px-2.5 py-1.5 rounded-lg bg-[#161B24]/60 border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] text-center">
+              {t(`${set.durationSeconds}s`)}
+            </div>
+          ) : (
+            <input
+              type="number"
+              min="0"
+              value={repsText}
+              onChange={(e) => {
+                const str = e.target.value;
+                setRepsText(str);
+                const parsed = parseInt(str, 10);
+                if (Number.isFinite(parsed)) {
+                  onRepsChange(parsed);
+                }
+              }}
+              className="w-16 sm:w-20 px-2.5 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-sm font-bold font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#FF2D55]"
+            />
+          )}
+        </div>
       </div>
+
+      {/* Accessories Selection Drawer */}
+      {showAccessoriesMenu && (
+        <div
+          className="px-3 py-2 bg-[#080B12] border-t border-white/10 space-y-1.5 animate-enter"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold tracking-wider text-[#8B949E] uppercase">
+              {t('Lifting Accessories & Gear')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAccessoriesMenu(false)}
+              className="text-[10px] text-[#00E5FF] font-bold hover:underline cursor-pointer"
+            >
+              {t('Done')}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {ALL_LIFTING_ACCESSORIES.map((acc) => {
+              const active = activeAccessories.includes(acc);
+              return (
+                <button
+                  key={acc}
+                  type="button"
+                  onClick={() => onToggleAccessory(acc)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    active
+                      ? 'bg-[#FF2D55] text-white shadow-[0_0_12px_rgba(255,45,85,0.4)] border border-[#FF2D55]'
+                      : 'bg-[#161B24] text-[#8B949E] border border-white/10 hover:border-white/20 hover:text-[#F0F6FC]'
+                  }`}
+                >
+                  {t(acc)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

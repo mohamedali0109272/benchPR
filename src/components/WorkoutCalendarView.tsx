@@ -167,7 +167,7 @@ export const WorkoutCalendarView: React.FC<WorkoutCalendarViewProps> = ({
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4">
           <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-extrabold tracking-wider text-[#8B949E]">
-            <Flame className="w-3.5 h-3.5 text-[#FF6D00] shrink-0" />
+            <Flame className="w-3.5 h-3.5 text-[#FF2D55] shrink-0" />
             <span className="truncate">{t('Current Streak')}</span>
           </div>
           <div className="mt-1.5 text-lg sm:text-xl font-black font-mono-num text-[#F0F6FC]">
@@ -274,7 +274,7 @@ export const WorkoutCalendarView: React.FC<WorkoutCalendarViewProps> = ({
                         : 'bg-[#1D2432] border-[#00E5FF] shadow-[0_0_14px_rgba(0,229,255,0.2)]'
                       : hasWorkout
                         ? isMulti
-                          ? 'bg-[#FF6D00]/15 border-[#FF6D00]/45 hover:border-[#FF6D00]'
+                          ? 'bg-[#FF2D55]/15 border-[#FF2D55]/45 hover:border-[#FF2D55]'
                           : 'bg-[#00E676]/12 border-[#00E676]/35 hover:border-[#00E676]/70'
                         : isToday
                           ? 'bg-[#18202E] border-[#00E5FF]/50 hover:border-[#00E5FF]'
@@ -300,7 +300,7 @@ export const WorkoutCalendarView: React.FC<WorkoutCalendarViewProps> = ({
                         {dayLogs.slice(0, 3).map((log) => (
                           <span
                             key={log.workoutLog.id}
-                            className="w-1.5 h-1.5 rounded-full bg-[#FF9E40]"
+                            className="w-1.5 h-1.5 rounded-full bg-[#FF6B8B]"
                           />
                         ))}
                       </>
@@ -327,8 +327,8 @@ export const WorkoutCalendarView: React.FC<WorkoutCalendarViewProps> = ({
             <span>{t('Completed Day')}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-[#FF6D00]/15 border border-[#FF6D00]/45 flex items-center justify-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF9E40]" />
+            <span className="w-3.5 h-3.5 rounded bg-[#FF2D55]/15 border border-[#FF2D55]/45 flex items-center justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B8B]" />
             </span>
             <span>{t('Multi-session')}</span>
           </span>

@@ -3,6 +3,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { RankingEngine } from '../data/RankingEngine';
 import { Splits } from '../data/Splits';
+import { auth, db, onAuthStateChanged } from '../services/firebase';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import {
   computeBestBenchLifted,
   computeBestDeadliftLifted,
@@ -14,6 +16,7 @@ import {
   loadWorkouts,
   resolveLanguage,
   savePreferences,
+  saveWorkoutsList,
   StoredPreferences,
 } from '../data/storage';
 import {
@@ -30,6 +33,7 @@ import {
   WeightUnit,
   WorkoutSessionTemplate,
   WorkoutWithSets,
+  LiftingAccessory,
 } from '../types/models';
 
 interface WorkoutContextValue {
@@ -66,6 +70,7 @@ interface WorkoutContextValue {
   toggleSetCompletion: (exerciseIndex: number, setIndex: number) => void;
   updateSetWeight: (exerciseIndex: number, setIndex: number, weight: number) => void;
   updateSetReps: (exerciseIndex: number, setIndex: number, reps: number) => void;
+  toggleSetAccessory: (exerciseIndex: number, setIndex: number, accessory: LiftingAccessory) => void;
   startTimer: (durationSeconds: number) => void;
   stopTimer: () => void;
   finishWorkout: (onSaved: () => void) => void;
@@ -103,10 +108,89 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const language = useMemo(() => resolveLanguage(prefs.languageCode), [prefs.languageCode]);
 
+  // Sync with Firestore when auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Sync user profile & prefs
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            const cloudPrefs: StoredPreferences = {
+              target1RM: data.targetBench ?? prefs.target1RM,
+              targetSquat1RM: data.targetSquat ?? prefs.targetSquat1RM,
+              targetDeadlift1RM: data.targetDeadlift ?? prefs.targetDeadlift1RM,
+              weightUnit: data.weightUnit ?? prefs.weightUnit,
+              bodyweightKg: data.bodyweightKg ?? prefs.bodyweightKg,
+              languageCode: data.languageCode ?? prefs.languageCode,
+            };
+            setPrefs(cloudPrefs);
+            savePreferences(cloudPrefs);
+          } else {
+            await setDoc(userRef, {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              targetBench: prefs.target1RM,
+              targetSquat: prefs.targetSquat1RM,
+              targetDeadlift: prefs.targetDeadlift1RM,
+              weightUnit: prefs.weightUnit,
+              bodyweightKg: prefs.bodyweightKg,
+              languageCode: prefs.languageCode,
+              createdAt: new Date().toISOString(),
+            });
+          }
+
+          // Sync workouts
+          const workoutsRef = collection(db, 'workouts');
+          const q = query(workoutsRef, where('userId', '==', user.uid));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            const cloudWorkouts: WorkoutWithSets[] = querySnap.docs.map((d) => d.data() as WorkoutWithSets);
+            const sorted = cloudWorkouts.sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
+            setHistoryWorkouts(sorted);
+            saveWorkoutsList(sorted);
+          } else {
+            // Upload local workouts to cloud
+            const local = loadWorkouts();
+            for (const w of local) {
+              await setDoc(doc(db, 'workouts', String(w.workoutLog.id)), {
+                ...w,
+                userId: user.uid,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Firestore sync error on login:', err);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const updatePrefs = useCallback((updater: (prev: StoredPreferences) => StoredPreferences) => {
     setPrefs((prev) => {
       const next = updater(prev);
       savePreferences(next);
+      const user = auth.currentUser;
+      if (user) {
+        setDoc(
+          doc(db, 'users', user.uid),
+          {
+            targetBench: next.target1RM,
+            targetSquat: next.targetSquat1RM,
+            targetDeadlift: next.targetDeadlift1RM,
+            weightUnit: next.weightUnit,
+            bodyweightKg: next.bodyweightKg,
+            languageCode: next.languageCode,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        ).catch((err) => console.error('Failed to sync prefs to Firestore:', err));
+      }
       return next;
     });
   }, []);
@@ -433,6 +517,31 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const toggleSetAccessory = useCallback((exerciseIndex: number, setIndex: number, accessory: LiftingAccessory) => {
+    setActiveWorkout((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        exercises: current.exercises.map((ex, idx) =>
+          idx !== exerciseIndex
+            ? ex
+            : {
+                ...ex,
+                sets: ex.sets.map((set, sIdx) => {
+                  if (sIdx !== setIndex) return set;
+                  const currentAccs = set.accessories ?? [];
+                  const exists = currentAccs.includes(accessory);
+                  const nextAccs = exists
+                    ? currentAccs.filter((a) => a !== accessory)
+                    : [...currentAccs, accessory];
+                  return { ...set, accessories: nextAccs };
+                }),
+              },
+        ),
+      };
+    });
+  }, []);
+
   const finishWorkout = useCallback(
     (onSaved: () => void) => {
       if (!activeWorkout) return;
@@ -455,28 +564,40 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           actualWeight: set.actualWeight,
           actualReps: set.actualReps,
           isCompleted: set.isCompleted,
+          accessories: set.accessories ?? [],
         })),
       );
 
-      setHistoryWorkouts((prev) =>
-        insertWorkout(
-          prev,
-          {
-            sessionId: activeWorkout.sessionTemplate.id,
-            sessionTitle: activeWorkout.sessionTemplate.title,
-            target1RM: activeWorkout.target1RM,
-            unit: activeWorkout.unit,
-            timestamp: Date.now(),
-            totalDurationSeconds: durationSeconds,
-            isCompleted: true,
-          },
-          setLogs,
-        ),
+      const nextWorkouts = insertWorkout(
+        historyWorkouts,
+        {
+          sessionId: activeWorkout.sessionTemplate.id,
+          sessionTitle: activeWorkout.sessionTemplate.title,
+          target1RM: activeWorkout.target1RM,
+          unit: activeWorkout.unit,
+          timestamp: Date.now(),
+          totalDurationSeconds: durationSeconds,
+          isCompleted: true,
+        },
+        setLogs,
       );
+
+      setHistoryWorkouts(nextWorkouts);
+
+      // Save to Firestore if signed in
+      const user = auth.currentUser;
+      if (user && nextWorkouts.length > 0) {
+        const latest = nextWorkouts[0];
+        setDoc(doc(db, 'workouts', String(latest.workoutLog.id)), {
+          ...latest,
+          userId: user.uid,
+        }).catch((err) => console.error('Failed to save workout to Firestore:', err));
+      }
+
       setActiveWorkout(null);
       onSaved();
     },
-    [activeWorkout, stopTimer],
+    [activeWorkout, historyWorkouts, stopTimer],
   );
 
   const cancelWorkout = useCallback(() => {
@@ -485,8 +606,16 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [stopTimer]);
 
   const deleteWorkoutLog = useCallback((logId: number) => {
-    setHistoryWorkouts((prev) => deleteWorkoutById(prev, logId));
-  }, []);
+    const nextWorkouts = deleteWorkoutById(historyWorkouts, logId);
+    setHistoryWorkouts(nextWorkouts);
+
+    const user = auth.currentUser;
+    if (user) {
+      deleteDoc(doc(db, 'workouts', String(logId))).catch((err) =>
+        console.error('Failed to delete workout from Firestore:', err),
+      );
+    }
+  }, [historyWorkouts]);
 
   const bestBenchLifted = useMemo(() => computeBestBenchLifted(historyWorkouts), [historyWorkouts]);
   const bestSquatLifted = useMemo(() => computeBestSquatLifted(historyWorkouts), [historyWorkouts]);
@@ -541,6 +670,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toggleSetCompletion,
     updateSetWeight,
     updateSetReps,
+    toggleSetAccessory,
     startTimer,
     stopTimer,
     finishWorkout,

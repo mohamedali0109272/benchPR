@@ -47,13 +47,13 @@ export const LanguageModal: React.FC<LanguageModalProps> = ({ current, onSelect,
                 }}
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98] cursor-pointer ${
                   selected
-                    ? 'bg-[#FF6D00]/15 border-[#FF6D00] text-[#F0F6FC]'
+                    ? 'bg-[#FF2D55]/15 border-[#FF2D55] text-[#F0F6FC]'
                     : 'bg-[#1A202B] border-white/10 text-[#8B949E] hover:text-[#F0F6FC] hover:border-white/20'
                 }`}
               >
                 <span className="text-base font-bold">{option.nativeName}</span>
                 {selected && (
-                  <span className="w-6 h-6 rounded-full bg-[#FF6D00] text-[#080A0F] flex items-center justify-center">
+                  <span className="w-6 h-6 rounded-full bg-[#FF2D55] text-[#080A0F] flex items-center justify-center">
                     <Check className="w-4 h-4 stroke-[3]" />
                   </span>
                 )}

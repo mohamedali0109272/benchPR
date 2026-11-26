@@ -48,7 +48,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       best: number | null;
       color: string;
     }> = [
-      { kind: 'bench', label: 'Bench', target: target1RM, best: bestBenchLifted, color: '#FF6D00' },
+      { kind: 'bench', label: 'Bench', target: target1RM, best: bestBenchLifted, color: '#FF2D55' },
       { kind: 'squat', label: 'Squat', target: targetSquat1RM, best: bestSquatLifted, color: '#00E5FF' },
       { kind: 'deadlift', label: 'Deadlift', target: targetDeadlift1RM, best: bestDeadliftLifted, color: '#B26BFF' },
     ];
@@ -74,12 +74,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="lg:col-span-7 flex flex-col gap-3 animate-enter">
           {/* Target PRs Card (Bench, Squat, Deadlift) */}
           <div className="relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
-            <div className="pointer-events-none absolute -top-20 -end-16 w-52 h-52 rounded-full bg-[#FF6D00]/15 blur-3xl" />
+            <div className="pointer-events-none absolute -top-20 -end-16 w-52 h-52 rounded-full bg-[#FF2D55]/15 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-20 -start-16 w-48 h-48 rounded-full bg-[#B26BFF]/10 blur-3xl" />
 
             <div className="relative flex items-center justify-between gap-2">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="text-[11px] font-extrabold tracking-widest text-[#FF9E40]">
+                <span className="text-[11px] font-extrabold tracking-widest text-[#FF6B8B]">
                   {t('TARGET PRS (1RM)')}
                 </span>
                 <span className="text-[11px] text-[#8B949E] font-medium">
@@ -204,15 +204,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           {/* Quick Stats Row */}
           <div className="grid grid-cols-2 gap-3 flex-1">
+            {/* Best Recorded Lifts (Bench, Squat, Deadlift) */}
             <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 flex flex-col justify-between hover:border-[#00E676]/40 transition-colors">
-              <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E]">
+              <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E] mb-2">
                 <TrendingUp className="w-4 h-4 text-[#00E676]" />
                 <span>{t('BEST RECORDED')}</span>
               </div>
-              <div className="mt-2 text-xl sm:text-2xl font-extrabold font-mono-num text-[#F0F6FC]">
-                {bestBenchLifted !== null
-                  ? `${formatPlainWeight(bestBenchLifted)} ${t(weightUnit)}`
-                  : t('No logs yet')}
+              <div className="grid grid-cols-3 gap-1.5">
+                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
+                  <div className="text-[10px] font-bold text-[#FF2D55]">{t('Bench')}</div>
+                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
+                    {bestBenchLifted !== null
+                      ? `${formatPlainWeight(bestBenchLifted)}`
+                      : '—'}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
+                  <div className="text-[10px] font-bold text-[#00E5FF]">{t('Squat')}</div>
+                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
+                    {bestSquatLifted !== null
+                      ? `${formatPlainWeight(bestSquatLifted)}`
+                      : '—'}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
+                  <div className="text-[10px] font-bold text-[#B26BFF]">{t('Deadlift')}</div>
+                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
+                    {bestDeadliftLifted !== null
+                      ? `${formatPlainWeight(bestDeadliftLifted)}`
+                      : '—'}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -242,7 +264,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <div className="pointer-events-none absolute -bottom-24 -start-16 w-64 h-64 rounded-full bg-[#00E5FF]/12 blur-3xl" />
           <div className="relative">
-            <div className="flex items-center gap-2 text-xs font-extrabold tracking-widest text-[#FF6D00]">
+            <div className="flex items-center gap-2 text-xs font-extrabold tracking-widest text-[#FF2D55]">
               <Flame className="w-4 h-4" />
               <span>{t('QUICK START')}</span>
             </div>
@@ -255,7 +277,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <button
               type="button"
               onClick={() => setShowExercisePicker(true)}
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#FF6D00] via-[#FF8500] to-[#FF9E40] animate-gradient-x text-[#080A0F] font-black text-sm tracking-wide flex items-center justify-center gap-2 shadow-[0_8px_28px_rgba(255,109,0,0.38)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#FF334B] to-[#FF6B8B] animate-gradient-x text-[#080A0F] font-black text-sm tracking-wide flex items-center justify-center gap-2 shadow-[0_8px_28px_rgba(255,45,85,0.38)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>{t('START AN EXERCISE')}</span>

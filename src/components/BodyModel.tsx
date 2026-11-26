@@ -39,7 +39,7 @@ export const BodyModel: React.FC<BodyModelProps> = ({ ranks, selected, onSelect 
 
   const selectedColor = selected
     ? RANK_TIER_MAP[ranks[selected]?.tier ?? RankTier.UNRANKED].color
-    : '#FF6D00';
+    : '#FF2D55';
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -155,7 +155,7 @@ export const BodyModel: React.FC<BodyModelProps> = ({ ranks, selected, onSelect 
           onClick={() => flipTo(false)}
           className={`px-5 py-1.5 rounded-full text-xs font-extrabold tracking-wider transition-all duration-200 whitespace-nowrap cursor-pointer ${
             !showBack
-              ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-[0_0_16px_rgba(255,109,0,0.4)]'
+              ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-[0_0_16px_rgba(255,45,85,0.4)]'
               : 'text-[#8B949E] hover:text-[#F0F6FC]'
           }`}
         >
@@ -166,7 +166,7 @@ export const BodyModel: React.FC<BodyModelProps> = ({ ranks, selected, onSelect 
           onClick={() => flipTo(true)}
           className={`px-5 py-1.5 rounded-full text-xs font-extrabold tracking-wider transition-all duration-200 whitespace-nowrap cursor-pointer ${
             showBack
-              ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-[0_0_16px_rgba(255,109,0,0.4)]'
+              ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-[0_0_16px_rgba(255,45,85,0.4)]'
               : 'text-[#8B949E] hover:text-[#F0F6FC]'
           }`}
         >

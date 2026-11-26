@@ -55,7 +55,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('Search exercises...')}
               autoFocus
-              className="w-full ps-10 pe-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF6D00] transition-colors"
+              className="w-full ps-10 pe-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF2D55] transition-colors"
             />
           </div>
 
@@ -65,7 +65,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
               onClick={() => setMuscle(null)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                 muscle === null
-                  ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-[0_0_12px_rgba(255,109,0,0.35)]'
+                  ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-[0_0_12px_rgba(255,45,85,0.35)]'
                   : 'bg-[#1A202B] text-[#8B949E] hover:text-[#F0F6FC] border border-white/5'
               }`}
             >
@@ -78,7 +78,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                 onClick={() => setMuscle(group)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                   muscle === group
-                    ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-[0_0_12px_rgba(255,109,0,0.35)]'
+                    ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-[0_0_12px_rgba(255,45,85,0.35)]'
                     : 'bg-[#1A202B] text-[#8B949E] hover:text-[#F0F6FC] border border-white/5'
                 }`}
               >
@@ -105,7 +105,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                     onPick(item);
                     onClose();
                   }}
-                  className="w-full text-start flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#161B24] border border-white/10 hover:border-[#FF6D00]/60 hover:bg-[#1B222E] active:scale-[0.99] transition-all cursor-pointer"
+                  className="w-full text-start flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#161B24] border border-white/10 hover:border-[#FF2D55]/60 hover:bg-[#1B222E] active:scale-[0.99] transition-all cursor-pointer"
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-[#F0F6FC] truncate">{t(item.name)}</div>

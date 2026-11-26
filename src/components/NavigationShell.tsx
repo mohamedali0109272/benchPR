@@ -2,6 +2,7 @@ import React from 'react';
 import { Award, Columns3, Dumbbell, Globe, History, List } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { AppRoute } from '../types/models';
+import { UserAuthBadge } from './UserAuthBadge';
 
 interface NavigationShellProps {
   currentRoute: AppRoute;
@@ -37,7 +38,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     <div className="min-h-screen flex flex-col bg-[#080A0F] text-[#F0F6FC] relative">
       {/* Subtle atmospheric color accents */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute -top-40 start-1/4 w-[520px] h-[520px] rounded-full bg-[#FF6D00]/[0.06] blur-[120px]" />
+        <div className="absolute -top-40 start-1/4 w-[520px] h-[520px] rounded-full bg-[#FF2D55]/[0.06] blur-[120px]" />
         <div className="absolute top-1/3 -end-32 w-[460px] h-[460px] rounded-full bg-[#00E5FF]/[0.05] blur-[120px]" />
         <div className="absolute -bottom-40 start-1/3 w-[480px] h-[480px] rounded-full bg-[#B26BFF]/[0.05] blur-[120px]" />
       </div>
@@ -52,7 +53,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               onClick={() => onNavigate('home')}
               className="flex items-center gap-2.5 whitespace-nowrap shrink-0 cursor-pointer group"
             >
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6D00] to-[#FF9E40] flex items-center justify-center text-[#080A0F] shadow-[0_0_16px_rgba(255,109,0,0.4)] group-hover:scale-105 transition-transform">
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF2D55] to-[#FF6B8B] flex items-center justify-center text-[#080A0F] shadow-[0_0_16px_rgba(255,45,85,0.4)] group-hover:scale-105 transition-transform">
                 <Dumbbell className="w-4 h-4 stroke-[2.5]" />
               </span>
               <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#F0F6FC]">
@@ -73,21 +74,22 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                     type="button"
                     onClick={() => onNavigate(item.route)}
                     className={`relative flex items-center gap-1.5 py-1.5 text-sm font-semibold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
-                      active ? 'text-[#FF6D00]' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+                      active ? 'text-[#FF2D55]' : 'text-[#8B949E] hover:text-[#F0F6FC]'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{t(item.label)}</span>
                     {active && (
-                      <span className="absolute -bottom-[19px] inset-x-0 h-[2px] rounded-full bg-gradient-to-r from-[#FF6D00] via-[#FF9E40] to-[#00E5FF]" />
+                      <span className="absolute -bottom-[19px] inset-x-0 h-[2px] rounded-full bg-gradient-to-r from-[#FF2D55] via-[#FF6B8B] to-[#00E5FF]" />
                     )}
                   </button>
                 );
               })}
             </nav>
 
-            {/* Zone 3: Language Switcher */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Zone 3: Auth & Language Switcher */}
+            <div className="flex items-center gap-3 shrink-0">
+              <UserAuthBadge />
               <button
                 type="button"
                 onClick={onOpenLanguage}
@@ -122,12 +124,12 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                   type="button"
                   onClick={() => onNavigate(item.route)}
                   className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    active ? 'text-[#FF6D00]' : 'text-[#6E7681] hover:text-[#8B949E]'
+                    active ? 'text-[#FF2D55]' : 'text-[#6E7681] hover:text-[#8B949E]'
                   }`}
                 >
                   <div
                     className={`px-3 py-1 rounded-full transition-all ${
-                      active ? 'bg-[#FF6D00]/15 shadow-[0_0_12px_rgba(255,109,0,0.25)]' : ''
+                      active ? 'bg-[#FF2D55]/15 shadow-[0_0_12px_rgba(255,45,85,0.25)]' : ''
                     }`}
                   >
                     <Icon className="w-5 h-5" />

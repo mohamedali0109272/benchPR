@@ -74,7 +74,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-bold tracking-wide text-[#FF9E40] mb-1.5">
+              <label className="block text-xs font-bold tracking-wide text-[#FF6B8B] mb-1.5">
                 {t('Bench 1RM')}
               </label>
               <input
@@ -84,7 +84,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
                 value={benchText}
                 onChange={(e) => setBenchText(e.target.value)}
                 autoFocus={initialFocusLift === 'bench'}
-                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-base font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF6D00] transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-base font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF2D55] transition-colors"
               />
             </div>
 
@@ -129,7 +129,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
                   onClick={() => setSelectedUnit(u)}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     selectedUnit === u
-                      ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-sm'
+                      ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-sm'
                       : 'text-[#8B949E] hover:text-[#F0F6FC]'
                   }`}
                 >
@@ -150,7 +150,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-xl text-sm font-extrabold bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(255,109,0,0.35)] cursor-pointer"
+            className="px-5 py-2.5 rounded-xl text-sm font-extrabold bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(255,45,85,0.35)] cursor-pointer"
           >
             {t('Save Target')}
           </button>

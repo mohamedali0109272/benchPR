@@ -39,7 +39,7 @@ interface LiftSeriesConfig {
 }
 
 const LIFT_SERIES: LiftSeriesConfig[] = [
-  { key: 'bench', label: 'Bench', color: '#FF6D00', gradientId: 'e1rmBenchGrad' },
+  { key: 'bench', label: 'Bench', color: '#FF2D55', gradientId: 'e1rmBenchGrad' },
   { key: 'squat', label: 'Squat', color: '#00E5FF', gradientId: 'e1rmSquatGrad' },
   { key: 'deadlift', label: 'Deadlift', color: '#B26BFF', gradientId: 'e1rmDeadliftGrad' },
 ];
@@ -372,7 +372,7 @@ export const OneRMTrendCard: React.FC = () => {
       {/* Time Estimate to Target 1RM */}
       <div className="relative mt-4 pt-3.5 border-t border-white/10">
         <div className="flex items-center gap-1.5 text-[10px] font-extrabold tracking-widest text-[#8B949E] mb-2.5">
-          <Clock className="w-3.5 h-3.5 text-[#FF9E40]" />
+          <Clock className="w-3.5 h-3.5 text-[#FF6B8B]" />
           <span>{t('TIME TO TARGET 1RM')}</span>
         </div>
 
