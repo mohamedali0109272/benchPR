@@ -32,7 +32,7 @@ function requestNativeIdToken(): Promise<string> {
   return new Promise((resolve, reject) => {
     window.__onNativeGoogleResult = (idToken, error) => {
       if (idToken) resolve(idToken);
-      else reject(new Error(error ?? 'Google sign-in was cancelled'));
+      else reject(new Error(error ?? 'CANCELLED'));
     };
     window.AndroidAuth!.signIn();
   });

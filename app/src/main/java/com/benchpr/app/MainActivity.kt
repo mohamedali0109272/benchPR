@@ -21,6 +21,7 @@ import androidx.core.view.WindowCompat
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
@@ -55,12 +56,25 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != RC_GOOGLE_SIGN_IN) return
 
-        try {
-            val account = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException::class.java)
-            deliverGoogleResult(account.idToken, null)
+        val account = try {
+            GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException::class.java)
         } catch (e: ApiException) {
             Log.w(TAG, "Google sign-in failed with status ${e.statusCode}", e)
-            deliverGoogleResult(null, "Google sign-in failed (code ${e.statusCode})")
+            if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                deliverGoogleResult(null, "CANCELLED")
+            } else {
+                // 10 = DEVELOPER_ERROR: the app's SHA-1 is not registered for this OAuth client.
+                deliverGoogleResult(null, "Google error ${e.statusCode}")
+            }
+            return
+        }
+
+        val token = account.idToken
+        if (token == null) {
+            Log.e(TAG, "Google account returned no ID token; check the Web client ID")
+            deliverGoogleResult(null, "No ID token (check Web client ID)")
+        } else {
+            deliverGoogleResult(token, null)
         }
     }
 

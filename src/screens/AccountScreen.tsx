@@ -19,7 +19,13 @@ export const AccountScreen: React.FC = () => {
       await signInWithGoogle();
     } catch (err) {
       console.error('Google sign in error:', err);
-      setError(t("Couldn't sign in. Please try again."));
+      const code = (err as { code?: string })?.code;
+      const message = err instanceof Error ? err.message : String(err);
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || message === 'CANCELLED') {
+        setError(null);
+      } else {
+        setError(`${t("Couldn't sign in.")} ${code ?? message}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -32,7 +38,7 @@ export const AccountScreen: React.FC = () => {
       await logoutUser();
     } catch (err) {
       console.error('Sign out error:', err);
-      setError(t("Couldn't sign out. Please try again."));
+      setError(`${t("Couldn't sign out.")} ${(err as { code?: string })?.code ?? String(err)}`);
     } finally {
       setBusy(false);
     }
