@@ -14,6 +14,8 @@ const WORKOUTS_KEY = 'benchpr_workouts_v1';
 
 export interface StoredPreferences {
   target1RM: number;
+  targetSquat1RM: number;
+  targetDeadlift1RM: number;
   weightUnit: WeightUnit;
   bodyweightKg: number;
   languageCode: string | null;
@@ -21,6 +23,8 @@ export interface StoredPreferences {
 
 const DEFAULT_PREFS: StoredPreferences = {
   target1RM: 100.0,
+  targetSquat1RM: 140.0,
+  targetDeadlift1RM: 180.0,
   weightUnit: 'kg',
   bodyweightKg: DEFAULT_BODYWEIGHT_KG,
   languageCode: null,
@@ -33,6 +37,12 @@ export function loadPreferences(): StoredPreferences {
     const parsed = JSON.parse(raw) as Partial<StoredPreferences>;
     return {
       target1RM: typeof parsed.target1RM === 'number' && parsed.target1RM > 0 ? parsed.target1RM : 100.0,
+      targetSquat1RM:
+        typeof parsed.targetSquat1RM === 'number' && parsed.targetSquat1RM > 0 ? parsed.targetSquat1RM : 140.0,
+      targetDeadlift1RM:
+        typeof parsed.targetDeadlift1RM === 'number' && parsed.targetDeadlift1RM > 0
+          ? parsed.targetDeadlift1RM
+          : 180.0,
       weightUnit: parsed.weightUnit === 'lbs' ? 'lbs' : 'kg',
       bodyweightKg:
         typeof parsed.bodyweightKg === 'number' && parsed.bodyweightKg >= 20 && parsed.bodyweightKg <= 400
@@ -103,12 +113,14 @@ export function deleteWorkoutById(current: WorkoutWithSets[], logId: number): Wo
 }
 
 const BENCH_NAMES = new Set(['Heavy Single', 'Bench press', 'Bench Press', 'Paused Bench']);
+const SQUAT_NAMES = new Set(['Barbell Squat', 'Front Squat']);
+const DEADLIFT_NAMES = new Set(['Deadlift', 'Romanian Deadlift']);
 
-export function computeBestBenchLifted(workouts: WorkoutWithSets[]): number | null {
+function computeBestByNames(workouts: WorkoutWithSets[], names: Set<string>): number | null {
   let max: number | null = null;
   for (const w of workouts) {
     for (const s of w.sets) {
-      if (s.isCompleted && BENCH_NAMES.has(s.exerciseName)) {
+      if (s.isCompleted && names.has(s.exerciseName)) {
         if (max === null || s.actualWeight > max) {
           max = s.actualWeight;
         }
@@ -116,6 +128,18 @@ export function computeBestBenchLifted(workouts: WorkoutWithSets[]): number | nu
     }
   }
   return max;
+}
+
+export function computeBestBenchLifted(workouts: WorkoutWithSets[]): number | null {
+  return computeBestByNames(workouts, BENCH_NAMES);
+}
+
+export function computeBestSquatLifted(workouts: WorkoutWithSets[]): number | null {
+  return computeBestByNames(workouts, SQUAT_NAMES);
+}
+
+export function computeBestDeadliftLifted(workouts: WorkoutWithSets[]): number | null {
+  return computeBestByNames(workouts, DEADLIFT_NAMES);
 }
 
 export function findLastLift(workouts: WorkoutWithSets[], exerciseName: string): LastLift | null {

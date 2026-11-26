@@ -6,6 +6,8 @@ import { RankingEngine } from '../data/RankingEngine';
 import { Splits } from '../data/Splits';
 import {
   computeBestBenchLifted,
+  computeBestDeadliftLifted,
+  computeBestSquatLifted,
   deleteWorkoutById,
   findLastLift,
   insertWorkout,
@@ -33,11 +35,15 @@ import {
 
 interface WorkoutContextValue {
   target1RM: number;
+  targetSquat1RM: number;
+  targetDeadlift1RM: number;
   weightUnit: WeightUnit;
   bodyweightKg: number;
   language: AppLanguage;
   historyWorkouts: WorkoutWithSets[];
   bestBenchLifted: number | null;
+  bestSquatLifted: number | null;
+  bestDeadliftLifted: number | null;
   totalWorkoutsCompleted: number;
   muscleRanks: Record<MuscleGroup, MuscleRankInfo>;
   overallRank: OverallRank;
@@ -47,6 +53,8 @@ interface WorkoutContextValue {
   isTimerRunning: boolean;
 
   updateTarget1RM: (newTarget: number) => void;
+  updateTargetSquat1RM: (newTarget: number) => void;
+  updateTargetDeadlift1RM: (newTarget: number) => void;
   updateWeightUnit: (unit: WeightUnit) => void;
   setLanguage: (lang: AppLanguage) => void;
   updateBodyweightKg: (kg: number) => void;
@@ -109,6 +117,22 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     (newTarget: number) => {
       if (!Number.isFinite(newTarget) || newTarget <= 0) return;
       updatePrefs((p) => ({ ...p, target1RM: newTarget }));
+    },
+    [updatePrefs],
+  );
+
+  const updateTargetSquat1RM = useCallback(
+    (newTarget: number) => {
+      if (!Number.isFinite(newTarget) || newTarget <= 0) return;
+      updatePrefs((p) => ({ ...p, targetSquat1RM: newTarget }));
+    },
+    [updatePrefs],
+  );
+
+  const updateTargetDeadlift1RM = useCallback(
+    (newTarget: number) => {
+      if (!Number.isFinite(newTarget) || newTarget <= 0) return;
+      updatePrefs((p) => ({ ...p, targetDeadlift1RM: newTarget }));
     },
     [updatePrefs],
   );
@@ -479,6 +503,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const bestBenchLifted = useMemo(() => computeBestBenchLifted(historyWorkouts), [historyWorkouts]);
+  const bestSquatLifted = useMemo(() => computeBestSquatLifted(historyWorkouts), [historyWorkouts]);
+  const bestDeadliftLifted = useMemo(() => computeBestDeadliftLifted(historyWorkouts), [historyWorkouts]);
   const totalWorkoutsCompleted = historyWorkouts.length;
 
   const muscleRanks = useMemo(() => {
@@ -498,11 +524,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const value: WorkoutContextValue = {
     target1RM: prefs.target1RM,
+    targetSquat1RM: prefs.targetSquat1RM,
+    targetDeadlift1RM: prefs.targetDeadlift1RM,
     weightUnit: prefs.weightUnit,
     bodyweightKg: prefs.bodyweightKg,
     language,
     historyWorkouts,
     bestBenchLifted,
+    bestSquatLifted,
+    bestDeadliftLifted,
     totalWorkoutsCompleted,
     muscleRanks,
     overallRank,
@@ -511,6 +541,8 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     timerTotalSeconds,
     isTimerRunning,
     updateTarget1RM,
+    updateTargetSquat1RM,
+    updateTargetDeadlift1RM,
     updateWeightUnit,
     setLanguage,
     updateBodyweightKg,

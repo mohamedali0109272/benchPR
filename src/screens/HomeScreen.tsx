@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Columns3, Dumbbell, Edit3, Flame, History, Play, Plus, TrendingUp } from 'lucide-react';
-import { Edit1RMModal } from '../components/Edit1RMModal';
+import { Edit1RMModal, TargetLiftKind } from '../components/Edit1RMModal';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
 import { useWorkout } from '../context/WorkoutContext';
 import { ProgramData } from '../data/ProgramData';
@@ -41,46 +41,118 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const {
     target1RM,
+    targetSquat1RM,
+    targetDeadlift1RM,
     weightUnit,
     bestBenchLifted,
+    bestSquatLifted,
+    bestDeadliftLifted,
     totalWorkoutsCompleted,
     updateTarget1RM,
+    updateTargetSquat1RM,
+    updateTargetDeadlift1RM,
     updateWeightUnit,
   } = useWorkout();
   const { t } = useI18n();
 
-  const [showEdit1RM, setShowEdit1RM] = useState(false);
+  const [editModalLift, setEditModalLift] = useState<TargetLiftKind | null>(null);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
+
+  const targetTotal = target1RM + targetSquat1RM + targetDeadlift1RM;
+  const bigThreeTargets: Array<{
+    kind: TargetLiftKind;
+    label: string;
+    target: number;
+    best: number | null;
+    color: string;
+  }> = [
+    { kind: 'bench', label: 'Bench', target: target1RM, best: bestBenchLifted, color: '#FF6D00' },
+    { kind: 'squat', label: 'Squat', target: targetSquat1RM, best: bestSquatLifted, color: '#00E5FF' },
+    { kind: 'deadlift', label: 'Deadlift', target: targetDeadlift1RM, best: bestDeadliftLifted, color: '#B26BFF' },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
       {/* Hero Grid: Target 1RM + Stats on Left, Quick Start on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         <div className="lg:col-span-7 flex flex-col gap-4 animate-enter">
-          {/* Target 1RM Card */}
-          <div className="relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+          {/* Target PRs Card (Bench, Squat, Deadlift) */}
+          <div className="relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-5 sm:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
             <div className="pointer-events-none absolute -top-24 -end-16 w-64 h-64 rounded-full bg-[#FF6D00]/15 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -start-16 w-56 h-56 rounded-full bg-[#B26BFF]/10 blur-3xl" />
+
             <div className="relative flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-extrabold tracking-widest text-[#FF9E40]">
-                  {t('TARGET BENCH PR (1RM)')}
+                  {t('TARGET PRS (1RM)')}
                 </div>
-                <div className="mt-2 flex items-baseline gap-2.5">
-                  <span className="text-4xl sm:text-5xl font-black font-mono-num tracking-tight text-[#F0F6FC]">
-                    {formatPlainWeight(target1RM)}
+                <div className="mt-1 text-xs text-[#8B949E] font-medium">
+                  {t('Target Total')}:{' '}
+                  <span className="font-bold font-mono-num text-[#F0F6FC]">
+                    {formatPlainWeight(targetTotal)} {t(weightUnit)}
                   </span>
-                  <span className="text-xl font-bold text-[#8B949E]">{t(weightUnit)}</span>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => setShowEdit1RM(true)}
-                aria-label={t('Edit Target 1RM')}
-                className="w-12 h-12 rounded-2xl bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#252E40] hover:border-[#00E5FF]/50 active:scale-95 transition-all cursor-pointer shrink-0"
+                onClick={() => setEditModalLift('bench')}
+                aria-label={t('Edit Target PRs')}
+                className="w-10 h-10 rounded-xl bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#252E40] hover:border-[#00E5FF]/50 active:scale-95 transition-all cursor-pointer shrink-0"
               >
-                <Edit3 className="w-5 h-5" />
+                <Edit3 className="w-4 h-4" />
               </button>
+            </div>
+
+            <div className="relative mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {bigThreeTargets.map((lift) => {
+                const ratio =
+                  lift.best !== null && lift.target > 0
+                    ? Math.min(1, Math.max(0, lift.best / lift.target))
+                    : 0;
+
+                return (
+                  <button
+                    key={lift.kind}
+                    type="button"
+                    onClick={() => setEditModalLift(lift.kind)}
+                    className="group text-start rounded-xl bg-[#0D1119]/90 border border-white/10 p-3.5 hover:border-white/25 active:scale-[0.985] transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className="text-xs font-extrabold tracking-wide"
+                        style={{ color: lift.color }}
+                      >
+                        {t(lift.label)}
+                      </span>
+                      <Edit3 className="w-3.5 h-3.5 text-[#6E7681] group-hover:text-[#F0F6FC] transition-colors" />
+                    </div>
+
+                    <div className="mt-1.5 flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-black font-mono-num tracking-tight text-[#F0F6FC]">
+                        {formatPlainWeight(lift.target)}
+                      </span>
+                      <span className="text-xs font-bold text-[#8B949E]">{t(weightUnit)}</span>
+                    </div>
+
+                    <div className="mt-2.5 h-1.5 rounded-full bg-[#1B2230] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.round(ratio * 100)}%`,
+                          backgroundColor: lift.color,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-1.5 text-[11px] text-[#8B949E] font-mono-num">
+                      {lift.best !== null
+                        ? `${t('Best')}: ${formatPlainWeight(lift.best)} ${t(weightUnit)}`
+                        : t('No logs yet')}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -188,15 +260,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </section>
 
-      {showEdit1RM && (
+      {editModalLift !== null && (
         <Edit1RMModal
-          currentTarget1RM={target1RM}
+          currentBench1RM={target1RM}
+          currentSquat1RM={targetSquat1RM}
+          currentDeadlift1RM={targetDeadlift1RM}
           currentUnit={weightUnit}
-          onClose={() => setShowEdit1RM(false)}
-          onSave={(newTarget, newUnit) => {
-            updateTarget1RM(newTarget);
-            updateWeightUnit(newUnit);
-            setShowEdit1RM(false);
+          initialFocusLift={editModalLift}
+          onClose={() => setEditModalLift(null)}
+          onSave={({ bench, squat, deadlift, unit }) => {
+            updateTarget1RM(bench);
+            updateTargetSquat1RM(squat);
+            updateTargetDeadlift1RM(deadlift);
+            updateWeightUnit(unit);
+            setEditModalLift(null);
           }}
         />
       )}

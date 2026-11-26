@@ -3,27 +3,46 @@ import { X } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { WeightUnit } from '../types/models';
 
+export type TargetLiftKind = 'bench' | 'squat' | 'deadlift';
+
 interface Edit1RMModalProps {
-  currentTarget1RM: number;
+  currentBench1RM: number;
+  currentSquat1RM: number;
+  currentDeadlift1RM: number;
   currentUnit: WeightUnit;
+  initialFocusLift?: TargetLiftKind;
   onClose: () => void;
-  onSave: (newTarget: number, newUnit: WeightUnit) => void;
+  onSave: (targets: { bench: number; squat: number; deadlift: number; unit: WeightUnit }) => void;
 }
 
 export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
-  currentTarget1RM,
+  currentBench1RM,
+  currentSquat1RM,
+  currentDeadlift1RM,
   currentUnit,
+  initialFocusLift = 'bench',
   onClose,
   onSave,
 }) => {
   const { t } = useI18n();
-  const [textValue, setTextValue] = useState(currentTarget1RM.toString());
+  const [benchText, setBenchText] = useState(currentBench1RM.toString());
+  const [squatText, setSquatText] = useState(currentSquat1RM.toString());
+  const [deadliftText, setDeadliftText] = useState(currentDeadlift1RM.toString());
   const [selectedUnit, setSelectedUnit] = useState<WeightUnit>(currentUnit);
+
+  const parsePositive = (raw: string, fallback: number) => {
+    const parsed = parseFloat(raw.replace(',', '.'));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = parseFloat(textValue.replace(',', '.'));
-    onSave(Number.isFinite(parsed) && parsed > 0 ? parsed : currentTarget1RM, selectedUnit);
+    onSave({
+      bench: parsePositive(benchText, currentBench1RM),
+      squat: parsePositive(squatText, currentSquat1RM),
+      deadlift: parsePositive(deadliftText, currentDeadlift1RM),
+      unit: selectedUnit,
+    });
   };
 
   return (
@@ -37,7 +56,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-[#F0F6FC]">{t('Set Target Bench PR')}</h2>
+          <h2 className="text-lg font-bold text-[#F0F6FC]">{t('Set Target PRs')}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -50,25 +69,57 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
 
         <div className="p-5 space-y-4">
           <p className="text-sm text-[#8B949E] leading-relaxed">
-            {t('Enter your goal single rep max (1RM). Exercise weights in all 3 sessions will auto-scale.')}
+            {t('Enter your goal single rep max (1RM) targets. Bench session weights auto-scale from your Bench PR.')}
           </p>
 
-          <div>
-            <label className="block text-xs font-semibold text-[#8B949E] mb-1.5">
-              {t('Target Weight')}
-            </label>
-            <input
-              type="number"
-              step="0.5"
-              min="1"
-              value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              autoFocus
-              className="w-full px-4 py-3 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-lg font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF6D00] transition-colors"
-            />
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold tracking-wide text-[#FF9E40] mb-1.5">
+                {t('Bench 1RM')}
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                value={benchText}
+                onChange={(e) => setBenchText(e.target.value)}
+                autoFocus={initialFocusLift === 'bench'}
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-base font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#FF6D00] transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold tracking-wide text-[#00E5FF] mb-1.5">
+                {t('Squat 1RM')}
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                value={squatText}
+                onChange={(e) => setSquatText(e.target.value)}
+                autoFocus={initialFocusLift === 'squat'}
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-base font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#00E5FF] transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold tracking-wide text-[#B26BFF] mb-1.5">
+                {t('Deadlift 1RM')}
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                value={deadliftText}
+                onChange={(e) => setDeadliftText(e.target.value)}
+                autoFocus={initialFocusLift === 'deadlift'}
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0D13] border border-[#2A313D] text-base font-bold font-mono-num text-[#F0F6FC] focus:outline-none focus:border-[#B26BFF] transition-colors"
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pt-1">
             <span className="text-sm font-medium text-[#F0F6FC]">{t('Unit:')}</span>
             <div className="inline-flex p-1 rounded-xl bg-[#0A0D13] border border-white/10 gap-1">
               {(['kg', 'lbs'] as WeightUnit[]).map((u) => (
