@@ -6,6 +6,10 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import java.io.File
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -38,6 +42,78 @@ class MainActivity : Activity() {
                 .requestIdToken(WEB_CLIENT_ID)
                 .build(),
         )
+    }
+
+    /** Exposed to JavaScript as window.AndroidUpdater. Native code always re-reads the latest release itself. */
+    inner class AndroidUpdateBridge {
+        @JavascriptInterface
+        fun check() {
+            Thread {
+                val result = try {
+                    val release = AppUpdater.fetchLatest()
+                    val installed = AppUpdater.installedTime(this@MainActivity)
+                    JSONObject()
+                        .put("available", release.apkUrl != null && release.publishedAt > installed)
+                        .put("latestTag", release.tag)
+                        .put("publishedAt", release.publishedAt)
+                        .put("installedAt", installed)
+                        .put("version", AppUpdater.installedVersion(this@MainActivity))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Update check failed", e)
+                    JSONObject().put("error", e.message ?: "Update check failed")
+                }
+                runOnUiThread {
+                    webView.evaluateJavascript("window.__onUpdateCheck && window.__onUpdateCheck($result);", null)
+                }
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun install() {
+            Thread {
+                try {
+                    val release = AppUpdater.fetchLatest()
+                    val url = release.apkUrl ?: throw IOException("Latest release has no APK")
+                    deliverUpdateStatus("downloading", null)
+                    val apk = AppUpdater.download(this@MainActivity, url)
+                    if (!AppUpdater.isSameApp(this@MainActivity, apk)) {
+                        throw IOException("Downloaded APK belongs to a different app")
+                    }
+                    runOnUiThread { launchInstaller(apk) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Update install failed", e)
+                    deliverUpdateStatus("error", e.message ?: "Update failed")
+                }
+            }.start()
+        }
+    }
+
+    private fun launchInstaller(apk: File) {
+        if (!packageManager.canRequestPackageInstalls()) {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            deliverUpdateStatus("permission", null)
+            return
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+        startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        deliverUpdateStatus("installing", null)
+    }
+
+    private fun deliverUpdateStatus(stage: String, message: String?) {
+        val messageArg = message?.let { JSONObject.quote(it) } ?: "null"
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.__onUpdateStatus && window.__onUpdateStatus(${JSONObject.quote(stage)}, $messageArg);",
+                null,
+            )
+        }
     }
 
     /** Exposed to JavaScript as window.AndroidAuth. */
@@ -118,6 +194,7 @@ class MainActivity : Activity() {
                 loadWithOverviewMode = true
             }
             addJavascriptInterface(AndroidAuthBridge(), "AndroidAuth")
+            addJavascriptInterface(AndroidUpdateBridge(), "AndroidUpdater")
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                     if (consoleMessage != null) {
