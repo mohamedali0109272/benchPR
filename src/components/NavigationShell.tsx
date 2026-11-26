@@ -2,6 +2,7 @@ import React from 'react';
 import { Award, Columns3, Dumbbell, History, List, Settings } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { AppRoute } from '../types/models';
+import { AppLogo } from './AppLogo';
 import { SideMenu } from './SideMenu';
 
 interface NavigationShellProps {
@@ -56,7 +57,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               className="flex items-center gap-2.5 whitespace-nowrap shrink-0 cursor-pointer group"
             >
               <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF2D55] to-[#FF6B8B] flex items-center justify-center text-[#080A0F] shadow-[0_0_16px_rgba(255,45,85,0.4)] group-hover:scale-105 transition-transform">
-                <Dumbbell className="w-4 h-4 stroke-[2.5]" />
+                <AppLogo className="w-4 h-4" />
               </span>
               <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#F0F6FC]">
                 {t('BENCH PR TRACKER')}

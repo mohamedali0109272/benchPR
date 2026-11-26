@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Dumbbell, Play, Search, X } from 'lucide-react';
+import { Play, Search, X } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
+import { exerciseIcon } from '../data/exerciseIcons';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { useI18n } from '../i18n/I18nContext';
 import { ALL_MUSCLE_GROUPS, ExerciseItem, MUSCLE_DISPLAY_NAMES, MuscleGroup } from '../types/models';
@@ -9,17 +11,17 @@ interface ExercisesScreenProps {
 }
 
 const MUSCLE_COLORS: Record<MuscleGroup, string> = {
-  [MuscleGroup.CHEST]: '#FF6D00',
+  [MuscleGroup.CHEST]: '#FF2D55',
+  [MuscleGroup.TRICEPS]: '#FF6B8B',
   [MuscleGroup.SHOULDERS]: '#00E5FF',
   [MuscleGroup.BICEPS]: '#B26BFF',
-  [MuscleGroup.TRICEPS]: '#FF2D6F',
-  [MuscleGroup.FOREARMS]: '#FFC21A',
-  [MuscleGroup.CORE]: '#2EE6C5',
-  [MuscleGroup.TRAPS]: '#3FA9FF',
+  [MuscleGroup.FOREARMS]: '#C99BFF',
+  [MuscleGroup.TRAPS]: '#38BDF8',
   [MuscleGroup.LATS]: '#00E676',
-  [MuscleGroup.LOWER_BACK]: '#FF9E40',
-  [MuscleGroup.GLUTES]: '#FF5C8D',
-  [MuscleGroup.QUADS]: '#38BDF8',
+  [MuscleGroup.LOWER_BACK]: '#2EE6C5',
+  [MuscleGroup.CORE]: '#FFC21A',
+  [MuscleGroup.GLUTES]: '#F472B6',
+  [MuscleGroup.QUADS]: '#22D3EE',
   [MuscleGroup.HAMSTRINGS]: '#A78BFA',
   [MuscleGroup.CALVES]: '#34D399',
 };
@@ -39,7 +41,7 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
       {/* Title */}
       <div className="flex items-center justify-between gap-3 animate-enter">
         <div className="flex items-center gap-2.5">
-          <Dumbbell className="w-6 h-6 text-[#FF6D00]" />
+          <AppLogo className="w-6 h-6 text-[#FF2D55]" />
           <h1 className="text-xl font-black tracking-wide text-[#F0F6FC]">
             {t('EXERCISE LIBRARY')}
           </h1>
@@ -58,7 +60,7 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('Search by name or target muscle...')}
           aria-label={t('Search by name or target muscle...')}
-          className="w-full ps-11 pe-10 py-3 rounded-xl bg-[#131822] border border-white/10 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF6D00] transition-colors"
+          className="w-full ps-11 pe-10 py-3 rounded-xl bg-[#131822] border border-white/10 text-sm text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#FF2D55] transition-colors"
         />
         {searchQuery.length > 0 && (
           <button
@@ -82,7 +84,7 @@ export const ExercisesScreen: React.FC<ExercisesScreenProps> = ({ onStartExercis
           onClick={() => setSelectedMuscle(null)}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
             selectedMuscle === null
-              ? 'bg-gradient-to-r from-[#FF6D00] to-[#FF9100] text-[#080A0F] shadow-[0_0_14px_rgba(255,109,0,0.35)]'
+              ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF6B8B] text-[#080A0F] shadow-[0_0_14px_rgba(255,45,85,0.35)]'
               : 'bg-[#131822] text-[#8B949E] hover:text-[#F0F6FC] border border-white/10'
           }`}
         >
@@ -157,6 +159,7 @@ interface ExerciseCardProps {
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, accent, index, onStart }) => {
   const { t } = useI18n();
+  const Icon = exerciseIcon(exercise.id);
 
   return (
     <div
@@ -169,14 +172,22 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, accent, index, on
       />
 
       <div className="relative">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-base font-bold text-[#F0F6FC]">{t(exercise.name)}</h3>
+        <div className="flex items-start gap-3">
           <span
-            className="px-2.5 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0"
-            style={{ backgroundColor: `${accent}20`, color: accent }}
+            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border"
+            style={{ backgroundColor: `${accent}1A`, borderColor: `${accent}55`, color: accent }}
           >
-            {t(MUSCLE_DISPLAY_NAMES[exercise.muscleGroup])}
+            <Icon className="w-5 h-5" />
           </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-[#F0F6FC] leading-snug">{t(exercise.name)}</h3>
+            <span
+              className="mt-1 inline-block px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap"
+              style={{ backgroundColor: `${accent}20`, color: accent }}
+            >
+              {t(MUSCLE_DISPLAY_NAMES[exercise.muscleGroup])}
+            </span>
+          </div>
         </div>
 
         <p className="mt-2 text-xs sm:text-[13px] text-[#8B949E] leading-relaxed">
@@ -197,9 +208,11 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, accent, index, on
       <button
         type="button"
         onClick={onStart}
-        className="relative mt-4 w-full h-10 rounded-xl bg-gradient-to-r from-[#FF6D00] to-[#FF9E40] text-[#080A0F] font-black text-xs tracking-wider flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_4px_16px_rgba(255,109,0,0.28)]"
+        className="relative mt-4 w-full h-10 rounded-xl bg-gradient-to-r from-[#FF2D55] to-[#FF6B8B] text-[#080A0F] font-black text-xs tracking-wider flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_4px_16px_rgba(255,45,85,0.28)]"
       >
-        <Play className="w-4 h-4 fill-current" />
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0F172A]">
+          <Play className="w-2.5 h-2.5 fill-white text-white translate-x-[1px]" />
+        </span>
         <span>{t('START THIS EXERCISE')}</span>
       </button>
     </div>
