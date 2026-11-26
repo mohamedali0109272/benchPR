@@ -15,26 +15,24 @@ android {
         versionName = "1.0"
     }
 
-    signingConfigs {
-        create("ci") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
+    val ciKeystorePath: String? = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+
+    if (ciKeystorePath != null) {
+        signingConfigs {
+            create("ci") {
+                storeFile = file(ciKeystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
-            } else if (file("debug.keystore").exists()) {
-                storeFile = file("debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
             }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("ci")
+            if (ciKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("ci")
+            }
         }
         release {
             isMinifyEnabled = false
