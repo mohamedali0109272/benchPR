@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Clock, Columns3, Dumbbell, Edit3, Flame, History, Play, Plus, TrendingUp } from 'lucide-react';
+import { Clock, Columns3, Dumbbell, Edit3, Flame, Play, Plus, TrendingUp } from 'lucide-react';
 import { Edit1RMModal, TargetLiftKind } from '../components/Edit1RMModal';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
 import { OneRMTrendCard } from '../components/OneRMTrendCard';
@@ -94,7 +94,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 type="button"
                 onClick={() => setEditModalLift('bench')}
                 aria-label={t('Edit Target PRs')}
-                className="w-8 h-8 rounded-lg bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#252E40] hover:border-[#00E5FF]/50 active:scale-95 transition-all cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-lg bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#94A3B8] hover:bg-[#252E40] hover:border-white/25 hover:text-[#F0F6FC] active:scale-95 transition-all cursor-pointer shrink-0"
               >
                 <Edit3 className="w-3.5 h-3.5" />
               </button>
@@ -164,37 +164,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </span>
                       </div>
 
-                      <div className="mt-1 text-[10px] text-[#8B949E] font-mono-num truncate leading-none">
-                        {lift.best !== null
-                          ? `${t('Best')}: ${formatPlainWeight(lift.best)} ${t(weightUnit)}`
-                          : t('No logs yet')}
-                      </div>
-
-                      <div className="mt-1 flex items-center justify-center sm:justify-start gap-1 text-[10px] font-semibold leading-none truncate">
-                        <Clock
-                          className="w-2.5 h-2.5 shrink-0"
-                          style={{
-                            color:
-                              lift.eta.status === 'reached'
-                                ? '#00E676'
-                                : lift.eta.status === 'no_data'
-                                  ? '#6E7681'
-                                  : lift.color,
-                          }}
-                        />
-                        {lift.eta.status === 'reached' ? (
-                          <span className="text-[#00E676] truncate">{t('Goal reached!')}</span>
-                        ) : lift.eta.daysRemaining !== null ? (
-                          <span className="text-[#C9D1D9] font-mono-num truncate">
-                            {(() => {
-                              const parts = formatEtaParts(lift.eta.daysRemaining);
-                              return `${lift.eta.status === 'trend_pace' ? t('ETA') : t('Est.')} ${parts.value} ${t(parts.unitKey)}`;
-                            })()}
-                          </span>
-                        ) : (
-                          <span className="text-[#6E7681] truncate">{t('Log to estimate')}</span>
-                        )}
-                      </div>
+                      {lift.best !== null ? (
+                        <>
+                          <div className="mt-1 text-[10px] text-[#8B949E] font-mono-num truncate leading-none">
+                            {`${t('Best')}: ${formatPlainWeight(lift.best)} ${t(weightUnit)}`}
+                          </div>
+                          <div className="mt-1 flex items-center justify-center sm:justify-start gap-1 text-[10px] font-semibold leading-none whitespace-nowrap">
+                            <Clock
+                              className="w-2.5 h-2.5 shrink-0"
+                              style={{
+                                color: lift.eta.status === 'reached' ? '#00E676' : lift.color,
+                              }}
+                            />
+                            {lift.eta.status === 'reached' ? (
+                              <span className="text-[#00E676]">{t('Goal reached!')}</span>
+                            ) : lift.eta.daysRemaining !== null ? (
+                              <span className="text-[#C9D1D9] font-mono-num">
+                                {(() => {
+                                  const parts = formatEtaParts(lift.eta.daysRemaining);
+                                  return `${lift.eta.status === 'trend_pace' ? t('ETA') : t('Est.')} ${parts.value} ${t(parts.unitKey)}`;
+                                })()}
+                              </span>
+                            ) : (
+                              <span className="text-[#6E7681]">{t('No estimate')}</span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-1 text-[10px] text-[#6E7681] font-medium leading-none">
+                          {t('Unlogged')}
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
@@ -202,59 +202,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          {/* Quick Stats Row */}
-          <div className="grid grid-cols-2 gap-3 flex-1">
-            {/* Best Recorded Lifts (Bench, Squat, Deadlift) */}
-            <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 flex flex-col justify-between hover:border-[#00E676]/40 transition-colors">
-              <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E] mb-2">
-                <TrendingUp className="w-4 h-4 text-[#00E676]" />
-                <span>{t('BEST RECORDED')}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
-                  <div className="text-[10px] font-bold text-[#FF2D55]">{t('Bench')}</div>
-                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
-                    {bestBenchLifted !== null
-                      ? `${formatPlainWeight(bestBenchLifted)}`
-                      : '—'}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
-                  <div className="text-[10px] font-bold text-[#00E5FF]">{t('Squat')}</div>
-                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
-                    {bestSquatLifted !== null
-                      ? `${formatPlainWeight(bestSquatLifted)}`
-                      : '—'}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-[#0D1119]/80 border border-white/10 p-2 text-center">
-                  <div className="text-[10px] font-bold text-[#B26BFF]">{t('Deadlift')}</div>
-                  <div className="mt-1 text-xs sm:text-sm font-black font-mono-num text-[#F0F6FC] truncate">
-                    {bestDeadliftLifted !== null
-                      ? `${formatPlainWeight(bestDeadliftLifted)}`
-                      : '—'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onNavigateToHistory}
-              className="text-start rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 flex flex-col justify-between hover:border-[#00E5FF]/40 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E]">
-                <span className="flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4 text-[#00E5FF]" />
-                  <span>{t('COMPLETED')}</span>
-                </span>
-                <History className="w-3.5 h-3.5 text-[#6E7681]" />
-              </div>
-              <div className="mt-2 text-xl sm:text-2xl font-extrabold font-mono-num text-[#F0F6FC]">
-                {t(`${totalWorkoutsCompleted} Workouts`)}
-              </div>
-            </button>
-          </div>
         </div>
 
         {/* Quick Start Launchpad */}
@@ -277,9 +224,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <button
               type="button"
               onClick={() => setShowExercisePicker(true)}
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#FF334B] to-[#FF6B8B] animate-gradient-x text-[#080A0F] font-black text-sm tracking-wide flex items-center justify-center gap-2 shadow-[0_8px_28px_rgba(255,45,85,0.38)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#FF334B] to-[#FF6B8B] animate-gradient-x text-[#080A0F] font-black text-sm tracking-wide flex items-center justify-center gap-2.5 shadow-[0_8px_28px_rgba(255,45,85,0.38)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Play className="w-4 h-4 fill-current" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0F172A]">
+                <Play className="w-3 h-3 fill-white text-white translate-x-[1px]" />
+              </span>
               <span>{t('START AN EXERCISE')}</span>
             </button>
 
@@ -287,22 +236,69 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 type="button"
                 onClick={() => onQuickStart(null)}
-                className="h-11 px-3 rounded-xl bg-[#19202D] border border-[#00E5FF]/40 text-[#00E5FF] font-bold text-xs tracking-wide flex items-center justify-center gap-1.5 hover:bg-[#00E5FF]/10 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                className="h-11 px-2 rounded-xl bg-[#19202D] border border-[#00E5FF]/40 text-[#00E5FF] font-bold text-[11px] tracking-normal flex items-center justify-center gap-1.5 hover:bg-[#00E5FF]/10 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" />
-                <span className="truncate">{t('EMPTY WORKOUT')}</span>
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>{t('EMPTY WORKOUT')}</span>
               </button>
 
               <button
                 type="button"
                 onClick={onOpenSplits}
-                className="h-11 px-3 rounded-xl bg-[#19202D] border border-[#B26BFF]/40 text-[#C99BFF] font-bold text-xs tracking-wide flex items-center justify-center gap-1.5 hover:bg-[#B26BFF]/10 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                className="h-11 px-2 rounded-xl bg-[#19202D] border border-[#B26BFF]/40 text-[#C99BFF] font-bold text-[11px] tracking-normal flex items-center justify-center gap-1.5 hover:bg-[#B26BFF]/10 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
               >
-                <Columns3 className="w-4 h-4" />
-                <span className="truncate">{t('BROWSE SPLITS')}</span>
+                <Columns3 className="w-4 h-4 shrink-0" />
+                <span>{t('BROWSE SPLITS')}</span>
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Best Recorded Lifts (full width) with completed-workouts badge */}
+      <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 animate-enter">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E]">
+            <TrendingUp className="w-4 h-4 text-[#8B949E]" />
+            <span>{t('BEST RECORDED')}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onNavigateToHistory}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0D1119] border border-white/10 text-xs font-bold text-[#F0F6FC] hover:border-white/25 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+          >
+            <Dumbbell className="w-3.5 h-3.5 text-[#8B949E]" />
+            <span className="font-mono-num">{t(`${totalWorkoutsCompleted} Workouts`)}</span>
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { label: 'Bench', color: '#FF2D55', value: bestBenchLifted },
+            { label: 'Squat', color: '#00E5FF', value: bestSquatLifted },
+            { label: 'Deadlift', color: '#B26BFF', value: bestDeadliftLifted },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl bg-[#0D1119]/80 border border-white/10 px-3 py-2.5 min-w-0"
+            >
+              <div className="text-[11px] font-bold leading-none truncate" style={{ color: item.color }}>
+                {t(item.label)}
+              </div>
+              {item.value !== null ? (
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-lg sm:text-xl font-black font-mono-num text-[#F0F6FC] leading-none">
+                    {formatPlainWeight(item.value)}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#8B949E]">{t(weightUnit)}</span>
+                </div>
+              ) : (
+                <div className="mt-2 text-[11px] font-medium text-[#6E7681] leading-none">
+                  {t('No record yet')}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
