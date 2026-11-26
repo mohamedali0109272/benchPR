@@ -1,8 +1,8 @@
 import React from 'react';
-import { Award, Columns3, Dumbbell, Globe, History, List } from 'lucide-react';
+import { Award, Columns3, Dumbbell, History, List, Settings } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { AppRoute } from '../types/models';
-import { UserAuthBadge } from './UserAuthBadge';
+import { SideMenu } from './SideMenu';
 
 interface NavigationShellProps {
   currentRoute: AppRoute;
@@ -33,6 +33,8 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 }) => {
   const { t } = useI18n();
   const isSession = currentRoute === 'session';
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const closeMenu = React.useCallback(() => setMenuOpen(false), []);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#080A0F] text-[#F0F6FC] relative">
@@ -87,22 +89,29 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               })}
             </nav>
 
-            {/* Zone 3: Auth & Language Switcher */}
+            {/* Zone 3: Settings (opens side menu with account + language) */}
             <div className="flex items-center gap-3 shrink-0">
-              <UserAuthBadge />
               <button
                 type="button"
-                onClick={onOpenLanguage}
-                aria-label={t('Language')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-xs font-bold text-[#00E5FF] hover:bg-[#1E2532] hover:border-[#00E5FF]/40 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={() => setMenuOpen(true)}
+                aria-label={t('Settings')}
+                className="p-2 rounded-lg bg-[#161B24] border border-white/10 text-[#8B949E] hover:text-[#F0F6FC] hover:border-[#FF2D55]/50 transition-all cursor-pointer"
               >
-                <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('Language')}</span>
+                <Settings className="w-4 h-4" />
               </button>
             </div>
           </div>
         </header>
       )}
+
+      <SideMenu
+        open={menuOpen}
+        onClose={closeMenu}
+        onOpenLanguage={() => {
+          setMenuOpen(false);
+          onOpenLanguage();
+        }}
+      />
 
       {/* Main Content */}
       <main className={`relative z-10 flex-1 ${!isSession ? 'pb-20 md:pb-8' : ''}`}>
