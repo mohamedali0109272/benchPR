@@ -52,3 +52,7 @@ captures/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Node modules & local setup
+node_modules/
+.local/
