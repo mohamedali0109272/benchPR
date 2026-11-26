@@ -4,8 +4,25 @@ A professional, high-performance strength training and powerlifting tracker feat
 
 ## App Screenshots
 
-### Dashboard & Analytics
-![Dashboard Preview](app/src/main/res/drawable/benchpr_hero_mockup_1795704123624.jpg)
+### Dashboard
+Target PRs with progress rings, best recorded lifts, quick start, and the 30-day 1RM trend.
+
+<img src="docs/screenshots/dashboard.jpg" alt="BenchPR dashboard" width="300" />
+
+### Exercise Library
+Searchable library with a pictogram for every exercise, muscle filters, and Arabic support.
+
+<img src="docs/screenshots/exercise-library.jpg" alt="Exercise library in Arabic" width="300" />
+
+### Muscle Ranks & Body Model
+Interactive body model that colors each muscle group by its current rank.
+
+<img src="docs/screenshots/muscle-body-model.jpg" alt="Body model with muscle ranks" width="300" />
+
+### Muscle Rank Breakdown
+Per-muscle strength scores, progress toward the next tier, and the best lift behind each rank.
+
+<img src="docs/screenshots/muscle-ranks.jpg" alt="Muscle rank breakdown" width="300" />
 
 ### Active Workout Session & Gear Logging
 ![Session Preview](app/src/main/res/drawable/benchpr_session_mockup_1795704135317.jpg)
