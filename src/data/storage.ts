@@ -1,4 +1,4 @@
-import { DEFAULT_BODYWEIGHT_KG } from '../data/RankingEngine';
+import { DEFAULT_BODYWEIGHT_KG, RankingEngine } from '../data/RankingEngine';
 import { forBrowserLanguage, languageFromCode } from '../i18n/AppLanguage';
 import {
   AppLanguage,
@@ -112,9 +112,9 @@ export function deleteWorkoutById(current: WorkoutWithSets[], logId: number): Wo
   return next;
 }
 
-const BENCH_NAMES = new Set(['Heavy Single', 'Bench press', 'Bench Press', 'Paused Bench']);
-const SQUAT_NAMES = new Set(['Barbell Squat', 'Front Squat']);
-const DEADLIFT_NAMES = new Set(['Deadlift', 'Romanian Deadlift']);
+export const BENCH_NAMES = new Set(['Heavy Single', 'Bench press', 'Bench Press', 'Paused Bench']);
+export const SQUAT_NAMES = new Set(['Barbell Squat', 'Front Squat']);
+export const DEADLIFT_NAMES = new Set(['Deadlift', 'Romanian Deadlift']);
 
 function computeBestByNames(workouts: WorkoutWithSets[], names: Set<string>): number | null {
   let max: number | null = null;
@@ -154,4 +154,149 @@ export function findLastLift(workouts: WorkoutWithSets[], exerciseName: string):
     }
   }
   return null;
+}
+
+export type MainLiftKind = 'bench' | 'squat' | 'deadlift';
+
+export interface TargetTimeEstimate {
+  status: 'no_data' | 'reached' | 'trend_pace' | 'typical_pace';
+  daysRemaining: number | null;
+  weeklyRateDisplay: number | null;
+  currentBestEst1RM: number | null;
+}
+
+const TYPICAL_WEEKLY_GAIN_KG: Record<MainLiftKind, number> = {
+  bench: 1.0,
+  squat: 1.5,
+  deadlift: 2.0,
+};
+
+function liftNameSet(lift: MainLiftKind): Set<string> {
+  switch (lift) {
+    case 'bench':
+      return BENCH_NAMES;
+    case 'squat':
+      return SQUAT_NAMES;
+    case 'deadlift':
+      return DEADLIFT_NAMES;
+  }
+}
+
+export function estimateTimeToTarget1RM(
+  workouts: WorkoutWithSets[],
+  lift: MainLiftKind,
+  target1RM: number,
+  unit: WeightUnit,
+): TargetTimeEstimate {
+  if (!Number.isFinite(target1RM) || target1RM <= 0) {
+    return {
+      status: 'no_data',
+      daysRemaining: null,
+      weeklyRateDisplay: null,
+      currentBestEst1RM: null,
+    };
+  }
+
+  const names = liftNameSet(lift);
+  const dailyMap = new Map<string, { dayMs: number; peakEst: number }>();
+
+  for (const w of workouts) {
+    const dt = new Date(w.workoutLog.timestamp);
+    const dayMs = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+    for (const s of w.sets) {
+      if (!s.isCompleted || s.actualWeight <= 0 || s.actualReps <= 0 || !names.has(s.exerciseName)) {
+        continue;
+      }
+      const loadKg = RankingEngine.toKg(s.actualWeight, w.workoutLog.unit);
+      const estKg = RankingEngine.estimateOneRepMax(loadKg, s.actualReps);
+      const estDisplay = RankingEngine.fromKg(estKg, unit);
+      const existing = dailyMap.get(key);
+      if (!existing || estDisplay > existing.peakEst) {
+        dailyMap.set(key, { dayMs, peakEst: estDisplay });
+      }
+    }
+  }
+
+  const dailyPeaks = Array.from(dailyMap.values()).sort((a, b) => a.dayMs - b.dayMs);
+  if (dailyPeaks.length === 0) {
+    return {
+      status: 'no_data',
+      daysRemaining: null,
+      weeklyRateDisplay: null,
+      currentBestEst1RM: null,
+    };
+  }
+
+  const bestEst = dailyPeaks.reduce((m, d) => (d.peakEst > m ? d.peakEst : m), 0);
+  const roundedBest = Math.round(bestEst * 10) / 10;
+
+  if (bestEst >= target1RM) {
+    return {
+      status: 'reached',
+      daysRemaining: 0,
+      weeklyRateDisplay: null,
+      currentBestEst1RM: roundedBest,
+    };
+  }
+
+  const remaining = target1RM - bestEst;
+
+  if (dailyPeaks.length >= 2) {
+    const firstDayMs = dailyPeaks[0].dayMs;
+    const dayMsUnit = 24 * 60 * 60 * 1000;
+    const pts = dailyPeaks.map((d) => ({
+      x: (d.dayMs - firstDayMs) / dayMsUnit,
+      y: d.peakEst,
+    }));
+    const n = pts.length;
+    const meanX = pts.reduce((acc, p) => acc + p.x, 0) / n;
+    const meanY = pts.reduce((acc, p) => acc + p.y, 0) / n;
+    let num = 0;
+    let den = 0;
+    for (const p of pts) {
+      const dx = p.x - meanX;
+      num += dx * (p.y - meanY);
+      den += dx * dx;
+    }
+    const slopePerDay = den > 0 ? num / den : 0;
+
+    if (slopePerDay > 0.02) {
+      const weeklyRate = slopePerDay * 7;
+      const daysRemaining = Math.max(1, Math.min(3650, Math.ceil(remaining / slopePerDay)));
+      return {
+        status: 'trend_pace',
+        daysRemaining,
+        weeklyRateDisplay: Math.round(weeklyRate * 10) / 10,
+        currentBestEst1RM: roundedBest,
+      };
+    }
+  }
+
+  const typicalWeekly = RankingEngine.fromKg(TYPICAL_WEEKLY_GAIN_KG[lift], unit);
+  const daysRemaining = Math.max(1, Math.min(3650, Math.ceil((remaining / typicalWeekly) * 7)));
+  return {
+    status: 'typical_pace',
+    daysRemaining,
+    weeklyRateDisplay: Math.round(typicalWeekly * 10) / 10,
+    currentBestEst1RM: roundedBest,
+  };
+}
+
+export function formatEtaParts(days: number): {
+  value: string;
+  unitKey: 'days' | 'wks' | 'mos' | 'yrs';
+} {
+  if (days < 7) {
+    return { value: `~${days}`, unitKey: 'days' };
+  }
+  if (days < 70) {
+    return { value: `~${Math.max(1, Math.round(days / 7))}`, unitKey: 'wks' };
+  }
+  if (days < 365) {
+    return { value: `~${Math.max(2, Math.round(days / 30))}`, unitKey: 'mos' };
+  }
+  const years = Math.round((days / 365) * 10) / 10;
+  return { value: `~${years}`, unitKey: 'yrs' };
 }

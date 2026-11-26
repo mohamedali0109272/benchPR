@@ -1,40 +1,20 @@
-import React, { useState } from 'react';
-import { Columns3, Dumbbell, Edit3, Flame, History, Play, Plus, TrendingUp } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Clock, Columns3, Dumbbell, Edit3, Flame, History, Play, Plus, TrendingUp } from 'lucide-react';
 import { Edit1RMModal, TargetLiftKind } from '../components/Edit1RMModal';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
+import { OneRMTrendCard } from '../components/OneRMTrendCard';
 import { useWorkout } from '../context/WorkoutContext';
-import { ProgramData } from '../data/ProgramData';
 import { formatPlainWeight } from '../data/RankingEngine';
+import { estimateTimeToTarget1RM, formatEtaParts } from '../data/storage';
 import { useI18n } from '../i18n/I18nContext';
-import { WorkoutSessionTemplate } from '../types/models';
 
 interface HomeScreenProps {
-  onStartSession: (sessionId: number) => void;
   onQuickStart: (exerciseId: string | null) => void;
   onOpenSplits: () => void;
   onNavigateToHistory: () => void;
 }
 
-const SESSION_THEMES: Record<number, { accent: string; glow: string; badgeBg: string }> = {
-  1: {
-    accent: '#FF6D00',
-    glow: 'from-[#FF6D00]/20 via-[#FF9E40]/5 to-transparent',
-    badgeBg: 'bg-[#FF6D00]/15 text-[#FF9E40]',
-  },
-  2: {
-    accent: '#00E5FF',
-    glow: 'from-[#00E5FF]/20 via-[#3FA9FF]/5 to-transparent',
-    badgeBg: 'bg-[#00E5FF]/15 text-[#00E5FF]',
-  },
-  3: {
-    accent: '#B26BFF',
-    glow: 'from-[#B26BFF]/20 via-[#FF2D6F]/5 to-transparent',
-    badgeBg: 'bg-[#B26BFF]/15 text-[#B26BFF]',
-  },
-};
-
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-  onStartSession,
   onQuickStart,
   onOpenSplits,
   onNavigateToHistory,
@@ -47,6 +27,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     bestBenchLifted,
     bestSquatLifted,
     bestDeadliftLifted,
+    historyWorkouts,
     totalWorkoutsCompleted,
     updateTarget1RM,
     updateTargetSquat1RM,
@@ -59,96 +40,161 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showExercisePicker, setShowExercisePicker] = useState(false);
 
   const targetTotal = target1RM + targetSquat1RM + targetDeadlift1RM;
-  const bigThreeTargets: Array<{
-    kind: TargetLiftKind;
-    label: string;
-    target: number;
-    best: number | null;
-    color: string;
-  }> = [
-    { kind: 'bench', label: 'Bench', target: target1RM, best: bestBenchLifted, color: '#FF6D00' },
-    { kind: 'squat', label: 'Squat', target: targetSquat1RM, best: bestSquatLifted, color: '#00E5FF' },
-    { kind: 'deadlift', label: 'Deadlift', target: targetDeadlift1RM, best: bestDeadliftLifted, color: '#B26BFF' },
-  ];
+  const bigThreeTargets = useMemo(() => {
+    const defs: Array<{
+      kind: TargetLiftKind;
+      label: string;
+      target: number;
+      best: number | null;
+      color: string;
+    }> = [
+      { kind: 'bench', label: 'Bench', target: target1RM, best: bestBenchLifted, color: '#FF6D00' },
+      { kind: 'squat', label: 'Squat', target: targetSquat1RM, best: bestSquatLifted, color: '#00E5FF' },
+      { kind: 'deadlift', label: 'Deadlift', target: targetDeadlift1RM, best: bestDeadliftLifted, color: '#B26BFF' },
+    ];
+    return defs.map((item) => ({
+      ...item,
+      eta: estimateTimeToTarget1RM(historyWorkouts, item.kind, item.target, weightUnit),
+    }));
+  }, [
+    bestBenchLifted,
+    bestDeadliftLifted,
+    bestSquatLifted,
+    historyWorkouts,
+    target1RM,
+    targetDeadlift1RM,
+    targetSquat1RM,
+    weightUnit,
+  ]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
       {/* Hero Grid: Target 1RM + Stats on Left, Quick Start on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        <div className="lg:col-span-7 flex flex-col gap-4 animate-enter">
+        <div className="lg:col-span-7 flex flex-col gap-3 animate-enter">
           {/* Target PRs Card (Bench, Squat, Deadlift) */}
-          <div className="relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-5 sm:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
-            <div className="pointer-events-none absolute -top-24 -end-16 w-64 h-64 rounded-full bg-[#FF6D00]/15 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-24 -start-16 w-56 h-56 rounded-full bg-[#B26BFF]/10 blur-3xl" />
+          <div className="relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
+            <div className="pointer-events-none absolute -top-20 -end-16 w-52 h-52 rounded-full bg-[#FF6D00]/15 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 -start-16 w-48 h-48 rounded-full bg-[#B26BFF]/10 blur-3xl" />
 
-            <div className="relative flex items-center justify-between gap-4">
-              <div>
-                <div className="text-xs font-extrabold tracking-widest text-[#FF9E40]">
+            <div className="relative flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span className="text-[11px] font-extrabold tracking-widest text-[#FF9E40]">
                   {t('TARGET PRS (1RM)')}
-                </div>
-                <div className="mt-1 text-xs text-[#8B949E] font-medium">
+                </span>
+                <span className="text-[11px] text-[#8B949E] font-medium">
                   {t('Target Total')}:{' '}
                   <span className="font-bold font-mono-num text-[#F0F6FC]">
                     {formatPlainWeight(targetTotal)} {t(weightUnit)}
                   </span>
-                </div>
+                </span>
               </div>
 
               <button
                 type="button"
                 onClick={() => setEditModalLift('bench')}
                 aria-label={t('Edit Target PRs')}
-                className="w-10 h-10 rounded-xl bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#252E40] hover:border-[#00E5FF]/50 active:scale-95 transition-all cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-lg bg-[#1D2432] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#252E40] hover:border-[#00E5FF]/50 active:scale-95 transition-all cursor-pointer shrink-0"
               >
-                <Edit3 className="w-4 h-4" />
+                <Edit3 className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="relative mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="relative mt-2.5 grid grid-cols-3 gap-2 sm:gap-2.5">
               {bigThreeTargets.map((lift) => {
-                const ratio =
+                const rawRatio =
                   lift.best !== null && lift.target > 0
-                    ? Math.min(1, Math.max(0, lift.best / lift.target))
+                    ? Math.max(0, lift.best / lift.target)
                     : 0;
+                const clampedRatio = Math.min(1, rawRatio);
+                const percent = Math.round(rawRatio * 100);
+                const radius = 17;
+                const circumference = 2 * Math.PI * radius;
+                const dashOffset = circumference * (1 - clampedRatio);
 
                 return (
                   <button
                     key={lift.kind}
                     type="button"
                     onClick={() => setEditModalLift(lift.kind)}
-                    className="group text-start rounded-xl bg-[#0D1119]/90 border border-white/10 p-3.5 hover:border-white/25 active:scale-[0.985] transition-all cursor-pointer"
+                    className="group flex flex-col sm:flex-row items-center gap-2 sm:gap-2.5 rounded-xl bg-[#0D1119]/90 border border-white/10 px-2 py-2.5 sm:px-3 sm:py-2.5 hover:border-white/25 active:scale-[0.985] transition-all cursor-pointer text-center sm:text-start min-w-0"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className="text-xs font-extrabold tracking-wide"
+                    <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
+                      <svg className="w-11 h-11 -rotate-90" viewBox="0 0 42 42" aria-hidden="true">
+                        <circle
+                          cx="21"
+                          cy="21"
+                          r={radius}
+                          fill="none"
+                          stroke="#1B2230"
+                          strokeWidth="3.5"
+                        />
+                        <circle
+                          cx="21"
+                          cy="21"
+                          r={radius}
+                          fill="none"
+                          stroke={lift.color}
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={dashOffset}
+                          className="transition-all duration-500"
+                        />
+                      </svg>
+                      <span className="absolute text-[9.5px] font-extrabold font-mono-num text-[#F0F6FC]">
+                        {percent}%
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1 w-full">
+                      <div
+                        className="text-[11px] font-extrabold tracking-wide leading-none truncate"
                         style={{ color: lift.color }}
                       >
                         {t(lift.label)}
-                      </span>
-                      <Edit3 className="w-3.5 h-3.5 text-[#6E7681] group-hover:text-[#F0F6FC] transition-colors" />
-                    </div>
+                      </div>
 
-                    <div className="mt-1.5 flex items-baseline gap-1.5">
-                      <span className="text-2xl sm:text-3xl font-black font-mono-num tracking-tight text-[#F0F6FC]">
-                        {formatPlainWeight(lift.target)}
-                      </span>
-                      <span className="text-xs font-bold text-[#8B949E]">{t(weightUnit)}</span>
-                    </div>
+                      <div className="mt-1 flex items-baseline justify-center sm:justify-start gap-1">
+                        <span className="text-base sm:text-lg font-black font-mono-num tracking-tight text-[#F0F6FC] leading-none">
+                          {formatPlainWeight(lift.target)}
+                        </span>
+                        <span className="text-[10px] font-bold text-[#8B949E]">
+                          {t(weightUnit)}
+                        </span>
+                      </div>
 
-                    <div className="mt-2.5 h-1.5 rounded-full bg-[#1B2230] overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.round(ratio * 100)}%`,
-                          backgroundColor: lift.color,
-                        }}
-                      />
-                    </div>
+                      <div className="mt-1 text-[10px] text-[#8B949E] font-mono-num truncate leading-none">
+                        {lift.best !== null
+                          ? `${t('Best')}: ${formatPlainWeight(lift.best)} ${t(weightUnit)}`
+                          : t('No logs yet')}
+                      </div>
 
-                    <div className="mt-1.5 text-[11px] text-[#8B949E] font-mono-num">
-                      {lift.best !== null
-                        ? `${t('Best')}: ${formatPlainWeight(lift.best)} ${t(weightUnit)}`
-                        : t('No logs yet')}
+                      <div className="mt-1 flex items-center justify-center sm:justify-start gap-1 text-[10px] font-semibold leading-none truncate">
+                        <Clock
+                          className="w-2.5 h-2.5 shrink-0"
+                          style={{
+                            color:
+                              lift.eta.status === 'reached'
+                                ? '#00E676'
+                                : lift.eta.status === 'no_data'
+                                  ? '#6E7681'
+                                  : lift.color,
+                          }}
+                        />
+                        {lift.eta.status === 'reached' ? (
+                          <span className="text-[#00E676] truncate">{t('Goal reached!')}</span>
+                        ) : lift.eta.daysRemaining !== null ? (
+                          <span className="text-[#C9D1D9] font-mono-num truncate">
+                            {(() => {
+                              const parts = formatEtaParts(lift.eta.daysRemaining);
+                              return `${lift.eta.status === 'trend_pace' ? t('ETA') : t('Est.')} ${parts.value} ${t(parts.unitKey)}`;
+                            })()}
+                          </span>
+                        ) : (
+                          <span className="text-[#6E7681] truncate">{t('Log to estimate')}</span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 );
@@ -157,8 +203,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {/* Quick Stats Row */}
-          <div className="grid grid-cols-2 gap-4 flex-1">
-            <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-4 sm:p-5 flex flex-col justify-between hover:border-[#00E676]/40 transition-colors">
+          <div className="grid grid-cols-2 gap-3 flex-1">
+            <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 flex flex-col justify-between hover:border-[#00E676]/40 transition-colors">
               <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E]">
                 <TrendingUp className="w-4 h-4 text-[#00E676]" />
                 <span>{t('BEST RECORDED')}</span>
@@ -173,7 +219,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <button
               type="button"
               onClick={onNavigateToHistory}
-              className="text-start rounded-2xl bg-[#131822]/90 border border-white/10 p-4 sm:p-5 flex flex-col justify-between hover:border-[#00E5FF]/40 active:scale-[0.98] transition-all cursor-pointer"
+              className="text-start rounded-2xl bg-[#131822]/90 border border-white/10 p-3.5 sm:p-4 flex flex-col justify-between hover:border-[#00E5FF]/40 active:scale-[0.98] transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between gap-2 text-[11px] font-extrabold tracking-wider text-[#8B949E]">
                 <span className="flex items-center gap-2">
@@ -238,27 +284,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Bench PR Program Section */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-extrabold tracking-widest text-[#8B949E]">
-            {t('BENCH PR PROGRAM')}
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-          {ProgramData.ALL_SESSIONS.map((session, idx) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              target1RM={target1RM}
-              unit={weightUnit}
-              index={idx}
-              onStart={() => onStartSession(session.id)}
-            />
-          ))}
-        </div>
-      </section>
+      {/* 30-Day Estimated 1RM Trend */}
+      <OneRMTrendCard />
 
       {editModalLift !== null && (
         <Edit1RMModal
@@ -285,94 +312,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onClose={() => setShowExercisePicker(false)}
         />
       )}
-    </div>
-  );
-};
-
-interface SessionCardProps {
-  session: WorkoutSessionTemplate;
-  target1RM: number;
-  unit: 'kg' | 'lbs';
-  index: number;
-  onStart: () => void;
-}
-
-const SessionCard: React.FC<SessionCardProps> = ({
-  session,
-  target1RM,
-  unit,
-  index,
-  onStart,
-}) => {
-  const { t } = useI18n();
-  const theme = SESSION_THEMES[session.id] ?? SESSION_THEMES[1];
-
-  return (
-    <div
-      className="group relative overflow-hidden rounded-2xl bg-[#131822]/90 border border-white/10 p-5 flex flex-col justify-between hover:border-white/25 transition-all duration-200 animate-enter shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
-      style={{ animationDelay: `${140 + index * 70}ms` }}
-    >
-      {/* Top gradient ambient highlight */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b ${theme.glow} opacity-80 group-hover:opacity-100 transition-opacity`}
-      />
-
-      <div className="relative">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-lg font-extrabold text-[#F0F6FC] leading-snug">
-              {t(session.title)}
-            </h3>
-            <p className="mt-1 text-xs font-semibold" style={{ color: theme.accent }}>
-              {t(`Main goal: ${session.goal}`)}
-            </p>
-          </div>
-        </div>
-
-        <ul className="mt-5 space-y-2.5">
-          {session.exercises.map((exercise) => {
-            const weight = ProgramData.calculateWeight(target1RM, exercise.targetPercent);
-            const repOrSecStr = exercise.isStaticHold
-              ? `${Math.round(exercise.targetPercent)}% x ${exercise.targetDurationSeconds} seconds`
-              : `${Math.round(exercise.targetPercent)}% x ${exercise.targetReps}${
-                  exercise.totalSets > 1 ? ` (${exercise.totalSets} sets)` : ''
-                }`;
-
-            return (
-              <li
-                key={exercise.id}
-                className="flex items-center justify-between gap-3 py-1.5 border-b border-white/[0.05] last:border-b-0"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className="w-3.5 h-3.5 rounded-full border-2 shrink-0"
-                    style={{ borderColor: `${theme.accent}99` }}
-                  />
-                  <span className="text-[13px] text-[#F0F6FC] truncate">
-                    {t(`${exercise.name} - ${repOrSecStr}`)}
-                  </span>
-                </div>
-                <span className="text-xs font-bold font-mono-num text-[#00E5FF] whitespace-nowrap shrink-0">
-                  {formatPlainWeight(weight)} {t(unit)}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <button
-        type="button"
-        onClick={onStart}
-        className="relative mt-6 w-full h-11 rounded-xl font-black text-xs tracking-wider text-[#080A0F] flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-lg"
-        style={{
-          background: `linear-gradient(135deg, ${theme.accent}, #FF9E40)`,
-          boxShadow: `0 6px 20px ${theme.accent}40`,
-        }}
-      >
-        <Play className="w-4 h-4 fill-current" />
-        <span>{t(`START SESSION ${session.id}`)}</span>
-      </button>
     </div>
   );
 };

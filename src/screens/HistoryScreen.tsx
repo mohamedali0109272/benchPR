@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ChevronDown, History, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronDown, History, List, Trash2 } from 'lucide-react';
+import { WorkoutCalendarView } from '../components/WorkoutCalendarView';
 import { useWorkout } from '../context/WorkoutContext';
 import { formatPlainWeight } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
@@ -9,30 +10,73 @@ interface HistoryScreenProps {
   onBackClick: () => void;
 }
 
+type HistoryViewMode = 'list' | 'calendar';
+
 export const HistoryScreen: React.FC<HistoryScreenProps> = ({ onBackClick }) => {
   const { historyWorkouts, deleteWorkoutLog } = useWorkout();
   const { t, isRtl } = useI18n();
+  const [viewMode, setViewMode] = useState<HistoryViewMode>('list');
+
+  const renderCard = (item: WorkoutWithSets, idx: number) => (
+    <WorkoutHistoryCard
+      key={item.workoutLog.id}
+      workoutWithSets={item}
+      index={idx}
+      onDelete={() => deleteWorkoutLog(item.workoutLog.id)}
+    />
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      <div className="flex items-center gap-3 animate-enter">
-        <button
-          type="button"
-          onClick={onBackClick}
-          aria-label={t('Back')}
-          className="w-10 h-10 rounded-xl bg-[#161B24] border border-white/10 flex items-center justify-center text-[#F0F6FC] hover:bg-[#1F2633] active:scale-95 transition-all shrink-0 cursor-pointer"
-        >
-          <ArrowLeft className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
-        </button>
-        <div className="flex items-center gap-2.5">
-          <History className="w-5 h-5 text-[#00E5FF]" />
-          <h1 className="text-lg sm:text-xl font-black tracking-wide text-[#F0F6FC]">
-            {t('WORKOUT LOG HISTORY')}
-          </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 animate-enter">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBackClick}
+            aria-label={t('Back')}
+            className="w-10 h-10 rounded-xl bg-[#161B24] border border-white/10 flex items-center justify-center text-[#F0F6FC] hover:bg-[#1F2633] active:scale-95 transition-all shrink-0 cursor-pointer"
+          >
+            <ArrowLeft className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <History className="w-5 h-5 text-[#00E5FF]" />
+            <h1 className="text-lg sm:text-xl font-black tracking-wide text-[#F0F6FC]">
+              {t('WORKOUT LOG HISTORY')}
+            </h1>
+          </div>
+        </div>
+
+        <div className="inline-flex p-1 rounded-xl bg-[#131822]/90 border border-white/10 gap-1">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'list'
+                ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/35'
+                : 'text-[#8B949E] hover:text-[#F0F6FC] border border-transparent'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>{t('List')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('calendar')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'calendar'
+                ? 'bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/35'
+                : 'text-[#8B949E] hover:text-[#F0F6FC] border border-transparent'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>{t('Calendar')}</span>
+          </button>
         </div>
       </div>
 
-      {historyWorkouts.length === 0 ? (
+      {viewMode === 'calendar' ? (
+        <WorkoutCalendarView workouts={historyWorkouts} renderWorkoutCard={renderCard} />
+      ) : historyWorkouts.length === 0 ? (
         <div className="rounded-2xl bg-[#131822]/90 border border-white/10 py-16 px-6 text-center space-y-2 animate-enter">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-[#1A202D] flex items-center justify-center text-[#6E7681]">
             <History className="w-7 h-7" />
@@ -46,14 +90,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ onBackClick }) => 
         </div>
       ) : (
         <div className="space-y-3.5">
-          {historyWorkouts.map((item, idx) => (
-            <WorkoutHistoryCard
-              key={item.workoutLog.id}
-              workoutWithSets={item}
-              index={idx}
-              onDelete={() => deleteWorkoutLog(item.workoutLog.id)}
-            />
-          ))}
+          {historyWorkouts.map((item, idx) => renderCard(item, idx))}
         </div>
       )}
     </div>

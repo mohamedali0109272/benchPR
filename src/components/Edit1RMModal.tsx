@@ -69,7 +69,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
 
         <div className="p-5 space-y-4">
           <p className="text-sm text-[#8B949E] leading-relaxed">
-            {t('Enter your goal single rep max (1RM) targets. Bench session weights auto-scale from your Bench PR.')}
+            {t('Enter your goal single rep max (1RM) targets for Bench, Squat, and Deadlift.')}
           </p>
 
           <div className="space-y-3">

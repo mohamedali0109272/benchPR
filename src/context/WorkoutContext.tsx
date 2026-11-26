@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
-import { ProgramData } from '../data/ProgramData';
 import { RankingEngine } from '../data/RankingEngine';
 import { Splits } from '../data/Splits';
 import {
@@ -58,7 +57,6 @@ interface WorkoutContextValue {
   updateWeightUnit: (unit: WeightUnit) => void;
   setLanguage: (lang: AppLanguage) => void;
   updateBodyweightKg: (kg: number) => void;
-  startSession: (sessionId: number) => void;
   startSplitDay: (splitId: string, dayIndex: number) => void;
   startQuickWorkout: (exerciseId?: string | null) => void;
   addExercise: (item: ExerciseItem) => void;
@@ -236,18 +234,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
     },
     [applyPrefillToExercises, prefs.weightUnit, stopTimer],
-  );
-
-  const startSession = useCallback(
-    (sessionId: number) => {
-      const template = ProgramData.ALL_SESSIONS.find((s) => s.id === sessionId) ?? ProgramData.SESSION_1;
-      const activeExercises = template.exercises.map((exercise) => {
-        const targetWeight = ProgramData.calculateWeight(prefs.target1RM, exercise.targetPercent);
-        return buildActiveExercise(exercise, targetWeight);
-      });
-      beginWorkout(template, activeExercises, prefs.target1RM);
-    },
-    [beginWorkout, prefs.target1RM],
   );
 
   const startSplitDay = useCallback(
@@ -546,7 +532,6 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateWeightUnit,
     setLanguage,
     updateBodyweightKg,
-    startSession,
     startSplitDay,
     startQuickWorkout,
     addExercise,

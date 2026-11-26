@@ -16,7 +16,6 @@ const BenchPRAppContent: React.FC = () => {
   const {
     language,
     setLanguage,
-    startSession,
     startSplitDay,
     startQuickWorkout,
   } = useWorkout();
@@ -47,10 +46,6 @@ const BenchPRAppContent: React.FC = () => {
       >
         {route === 'home' && (
           <HomeScreen
-            onStartSession={(sessionId) => {
-              startSession(sessionId);
-              openSession();
-            }}
             onQuickStart={(exerciseId) => {
               startQuickWorkout(exerciseId);
               openSession();
