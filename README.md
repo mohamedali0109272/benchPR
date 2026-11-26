@@ -24,9 +24,6 @@ Per-muscle strength scores, progress toward the next tier, and the best lift beh
 
 <img src="docs/screenshots/muscle-ranks.jpg" alt="Muscle rank breakdown" width="300" />
 
-### Active Workout Session & Gear Logging
-![Session Preview](app/src/main/res/drawable/benchpr_session_mockup_1795704135317.jpg)
-
 ## Key Features
 
 - **Google Authentication & Cloud Persistence**: Sign in securely with your Google account to automatically record and sync all your workouts, preferences, and target PRs across sessions and devices via Firebase Firestore.
