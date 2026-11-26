@@ -38,8 +38,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode signing keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/benchpr.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/benchpr.jks"
+          else
+            echo "No KEYSTORE_BASE64 secret set; building with the default debug key."
+          fi
 
       - name: Build Android Debug APK
         env:
