@@ -56,3 +56,6 @@ Thumbs.db
 # Node modules & local setup
 node_modules/
 .local/
+
+# Vite build output
+dist/
