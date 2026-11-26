@@ -195,6 +195,15 @@ export const dayFocus: Record<string, string> = {
 };
 
 export const uiStrings: Record<string, string> = {
+  Account: 'الحساب',
+  'Sign in with Google': 'تسجيل الدخول بحساب Google',
+  'Sign Out': 'تسجيل الخروج',
+  'Signed in with Google': 'مسجّل الدخول بحساب Google',
+  'Not signed in': 'لم تسجّل الدخول',
+  'Sign in to sync your workouts across devices.': 'سجّل الدخول لمزامنة تمارينك على كل أجهزتك.',
+  Athlete: 'رياضي',
+  "Couldn't sign in. Please try again.": 'تعذّر تسجيل الدخول. حاول مرة أخرى.',
+  "Couldn't sign out. Please try again.": 'تعذّر تسجيل الخروج. حاول مرة أخرى.',
   Workouts: 'الجلسات',
   Splits: 'التقسيمات',
   Muscles: 'العضلات',

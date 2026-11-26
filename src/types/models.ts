@@ -238,4 +238,4 @@ export interface AppLanguage {
   isRtl: boolean;
 }
 
-export type AppRoute = 'home' | 'splits' | 'split-detail' | 'muscles' | 'exercises' | 'session' | 'history';
+export type AppRoute = 'home' | 'splits' | 'split-detail' | 'muscles' | 'exercises' | 'session' | 'history' | 'account';

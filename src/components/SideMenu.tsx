@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Globe, X } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
-import { UserAuthBadge } from './UserAuthBadge';
 
 interface SideMenuProps {
   open: boolean;
@@ -53,13 +52,6 @@ export const SideMenu: React.FC<SideMenuProps> = ({ open, onClose, onOpenLanguag
         </div>
 
         <div className="flex flex-col gap-4 p-5">
-          <section className="flex flex-col gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#6E7681]">{t('Account')}</p>
-            <div>
-              <UserAuthBadge />
-            </div>
-          </section>
-
           <section className="flex flex-col gap-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-[#6E7681]">{t('Preferences')}</p>
             <button
