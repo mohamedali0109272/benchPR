@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.benchpr.app.data.local.AppDatabase
 import com.benchpr.app.data.local.ExerciseSetLogEntity
 import com.benchpr.app.data.local.WorkoutLogEntity
+import com.benchpr.app.data.i18n.AppLanguage
 import com.benchpr.app.data.local.WorkoutWithSets
 import com.benchpr.app.data.model.ActiveExerciseState
 import com.benchpr.app.data.model.ActiveWorkoutState
@@ -53,6 +54,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = "kg"
+    )
+
+    val language: StateFlow<AppLanguage> = userPreferences.language.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AppLanguage.forDeviceLanguage(java.util.Locale.getDefault().language)
     )
 
     val bodyweightKg: StateFlow<Double> = userPreferences.bodyweightKg.stateIn(
@@ -135,6 +142,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun updateWeightUnit(unit: String) {
         viewModelScope.launch {
             userPreferences.updateWeightUnit(unit)
+        }
+    }
+
+    fun setLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            userPreferences.updateLanguage(language)
         }
     }
 

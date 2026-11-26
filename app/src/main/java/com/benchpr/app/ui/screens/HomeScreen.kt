@@ -40,7 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import com.benchpr.app.ui.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -73,6 +73,11 @@ import com.benchpr.app.ui.theme.TextMuted
 import com.benchpr.app.ui.theme.TextPrimary
 import com.benchpr.app.ui.theme.TextSecondary
 import com.benchpr.app.ui.viewmodel.WorkoutViewModel
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import com.benchpr.app.data.i18n.AppLanguage
+import com.benchpr.app.ui.components.bouncyClickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +95,8 @@ fun HomeScreen(
 
     var showEdit1RMDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    val language by viewModel.language.collectAsState()
 
     Scaffold(
         topBar = {
@@ -113,6 +120,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showLanguageDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Language",
+                            tint = SecondaryNeon
+                        )
+                    }
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(
                             imageVector = Icons.Default.History,
@@ -190,6 +204,14 @@ fun HomeScreen(
         }
     }
 
+    if (showLanguageDialog) {
+        LanguageDialog(
+            current = language,
+            onSelect = { viewModel.setLanguage(it) },
+            onDismiss = { showLanguageDialog = false }
+        )
+    }
+
     if (showExercisePicker) {
         ExercisePickerDialog(
             title = "Start an exercise",
@@ -210,6 +232,60 @@ fun HomeScreen(
             }
         )
     }
+}
+
+@Composable
+fun LanguageDialog(
+    current: AppLanguage,
+    onSelect: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = { Text("Language", fontWeight = FontWeight.Bold, color = TextPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppLanguage.entries.forEach { option ->
+                    val selected = option == current
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selected) SurfaceVariantDark else SurfaceDark)
+                            .border(
+                                width = 1.dp,
+                                color = if (selected) PrimaryNeon else CardBorderDark,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .bouncyClickable {
+                                onSelect(option)
+                                onDismiss()
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selected,
+                            onClick = null,
+                            colors = RadioButtonDefaults.colors(selectedColor = PrimaryNeon)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = option.nativeName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
+        }
+    )
 }
 
 @Composable

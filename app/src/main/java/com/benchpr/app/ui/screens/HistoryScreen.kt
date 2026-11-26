@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -31,7 +31,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import com.benchpr.app.ui.i18n.LocalTranslator
+import com.benchpr.app.ui.i18n.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -83,7 +84,7 @@ fun HistoryScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = TextPrimary
                         )
@@ -155,8 +156,9 @@ fun WorkoutHistoryCard(
     val workout = workoutWithSets.workoutLog
     val sets = workoutWithSets.sets
 
-    val dateFormat = remember { SimpleDateFormat("EEE, MMM d, yyyy • h:mm a", Locale.getDefault()) }
-    val formattedDate = remember(workout.timestamp) { dateFormat.format(Date(workout.timestamp)) }
+    val translator = LocalTranslator.current
+    val dateFormat = remember(translator) { SimpleDateFormat("EEE, MMM d, yyyy • h:mm a", translator.locale) }
+    val formattedDate = remember(workout.timestamp, dateFormat) { dateFormat.format(Date(workout.timestamp)) }
     val durationMinutes = workout.totalDurationSeconds / 60
 
     Card(

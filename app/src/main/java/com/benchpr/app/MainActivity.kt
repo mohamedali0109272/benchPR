@@ -24,11 +24,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.benchpr.app.ui.i18n.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -37,6 +42,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.benchpr.app.data.i18n.Translator
+import com.benchpr.app.ui.i18n.LocalTranslator
 import com.benchpr.app.ui.screens.ExercisesScreen
 import com.benchpr.app.ui.screens.HistoryScreen
 import com.benchpr.app.ui.screens.HomeScreen
@@ -99,6 +106,14 @@ fun BenchPRApp(
         navController.navigate("session")
     }
 
+    val language by workoutViewModel.language.collectAsState()
+    val translator = remember(language) { Translator(language) }
+
+    // Arabic switches the whole app to right-to-left and routes every Text through the translator.
+    CompositionLocalProvider(
+        LocalTranslator provides translator,
+        LocalLayoutDirection provides if (language.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    ) {
     Scaffold(
         bottomBar = {
             AnimatedVisibility(
@@ -235,5 +250,6 @@ fun BenchPRApp(
                 )
             }
         }
+    }
     }
 }

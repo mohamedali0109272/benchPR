@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.benchpr.app.data.i18n.AppLanguage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings")
 
@@ -18,6 +20,7 @@ class UserPreferences(private val context: Context) {
         val KEY_TARGET_1RM = doublePreferencesKey("target_1rm")
         val KEY_WEIGHT_UNIT = stringPreferencesKey("weight_unit")
         val KEY_BODYWEIGHT_KG = doublePreferencesKey("bodyweight_kg")
+        val KEY_LANGUAGE = stringPreferencesKey("language")
     }
 
     val target1RM: Flow<Double> = context.dataStore.data.map { preferences ->
@@ -31,6 +34,18 @@ class UserPreferences(private val context: Context) {
     /** Body weight is always stored in kilograms; the UI converts for display. */
     val bodyweightKg: Flow<Double> = context.dataStore.data.map { preferences ->
         preferences[KEY_BODYWEIGHT_KG] ?: 75.0
+    }
+
+    /** Until the lifter picks a language, the app follows the phone's language. */
+    val language: Flow<AppLanguage> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LANGUAGE]?.let { AppLanguage.fromCode(it) }
+            ?: AppLanguage.forDeviceLanguage(Locale.getDefault().language)
+    }
+
+    suspend fun updateLanguage(language: AppLanguage) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_LANGUAGE] = language.code
+        }
     }
 
     suspend fun updateBodyweightKg(kg: Double) {
