@@ -25,13 +25,23 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.io.InputStreamReader
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.SocketTimeoutException
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var pageLoaded = false
     private var pendingAuthResult: Triple<String?, String?, String?>? = null
+    @Volatile
+    private var authServerSocket: ServerSocket? = null
+    private val authServerExecutor = Executors.newSingleThreadExecutor()
 
     private val googleSignInClient: GoogleSignInClient by lazy {
         GoogleSignIn.getClient(
@@ -87,6 +97,7 @@ class MainActivity : Activity() {
     private fun handleAuthIntent(intent: Intent?) {
         val data = intent?.data ?: return
         if (data.scheme == "benchpr" && data.host == "auth") {
+            stopAuthServer()
             val idToken = data.getQueryParameter("idToken")
             val accessToken = data.getQueryParameter("accessToken")
             val error = data.getQueryParameter("error")
@@ -95,16 +106,90 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun launchBrowserAuth() {
+    private fun stopAuthServer() {
         try {
-            val authUrl = "https://ais-pre-xfm4qcf5k75dpba4xnkto3-697317136065.europe-west3.run.app/auth-popup.html"
-            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            authServerSocket?.close()
+        } catch (_: Exception) {
+        } finally {
+            authServerSocket = null
+        }
+    }
+
+    private fun launchBrowserAuth() {
+        stopAuthServer()
+        authServerExecutor.execute {
+            try {
+                val htmlBytes = assets.open("auth-popup.html").readBytes()
+                val server = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1")).apply {
+                    soTimeout = 180_000
+                }
+                authServerSocket = server
+                val port = server.localPort
+                val authUrl = "http://localhost:$port/auth-popup.html"
+
+                runOnUiThread {
+                    try {
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(browserIntent)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to open browser for local auth", e)
+                        stopAuthServer()
+                        deliverGoogleResult(null, "Could not open browser for sign-in")
+                    }
+                }
+
+                while (authServerSocket === server && !server.isClosed) {
+                    val client = try {
+                        server.accept()
+                    } catch (_: SocketTimeoutException) {
+                        break
+                    } catch (_: IOException) {
+                        break
+                    }
+
+                    client.use { socket ->
+                        val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
+                        val requestLine = reader.readLine().orEmpty()
+                        while (true) {
+                            val header = reader.readLine()
+                            if (header.isNullOrEmpty()) break
+                        }
+
+                        val out = socket.getOutputStream()
+                        if (requestLine.startsWith("GET /auth-popup.html")) {
+                            val headers = (
+                                "HTTP/1.1 200 OK\r\n" +
+                                    "Content-Type: text/html; charset=UTF-8\r\n" +
+                                    "Content-Length: ${htmlBytes.size}\r\n" +
+                                    "Cache-Control: no-store\r\n" +
+                                    "Connection: close\r\n\r\n"
+                                ).toByteArray(StandardCharsets.US_ASCII)
+                            out.write(headers)
+                            out.write(htmlBytes)
+                        } else {
+                            val body = "Not Found".toByteArray(StandardCharsets.UTF_8)
+                            val headers = (
+                                "HTTP/1.1 404 Not Found\r\n" +
+                                    "Content-Type: text/plain; charset=UTF-8\r\n" +
+                                    "Content-Length: ${body.size}\r\n" +
+                                    "Connection: close\r\n\r\n"
+                                ).toByteArray(StandardCharsets.US_ASCII)
+                            out.write(headers)
+                            out.write(body)
+                        }
+                        out.flush()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to launch local browser auth server", e)
+                runOnUiThread {
+                    deliverGoogleResult(null, "Could not start browser sign-in")
+                }
+            } finally {
+                stopAuthServer()
             }
-            startActivity(browserIntent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to launch browser auth", e)
-            deliverGoogleResult(null, "Could not open browser for sign-in")
         }
     }
 
@@ -274,6 +359,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        stopAuthServer()
+        authServerExecutor.shutdownNow()
         if (::webView.isInitialized) {
             webView.destroy()
         }

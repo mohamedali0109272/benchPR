@@ -145,7 +145,7 @@ export function openAndroidBrowserAuth(): void {
   if (window.AndroidAuth?.openBrowserAuth) {
     window.AndroidAuth.openBrowserAuth();
   } else {
-    window.open('https://ais-pre-xfm4qcf5k75dpba4xnkto3-697317136065.europe-west3.run.app/auth-popup.html', '_blank');
+    window.open(`${window.location.origin}/auth-popup.html`, '_blank');
   }
 }
 
