@@ -49,13 +49,37 @@ jobs:
         id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          USE_CI_KEYSTORE=0
           if [ -n "$KEYSTORE_BASE64" ]; then
-            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/benchpr.jks"
-            echo "path=$RUNNER_TEMP/benchpr.jks" >> "$GITHUB_OUTPUT"
+            if printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/benchpr.jks"; then
+              STORE_PW="${KEYSTORE_PASSWORD:-android}"
+              ALIAS="${KEY_ALIAS:-androiddebugkey}"
+              if keytool -list -keystore "$RUNNER_TEMP/benchpr.jks" -storepass "$STORE_PW" -alias "$ALIAS" >/dev/null 2>&1; then
+                echo "path=$RUNNER_TEMP/benchpr.jks" >> "$GITHUB_OUTPUT"
+                echo "store_password=$STORE_PW" >> "$GITHUB_OUTPUT"
+                echo "key_alias=$ALIAS" >> "$GITHUB_OUTPUT"
+                echo "key_password=${KEY_PASSWORD:-$STORE_PW}" >> "$GITHUB_OUTPUT"
+                USE_CI_KEYSTORE=1
+                echo "Verified CI signing keystore with alias '$ALIAS'."
+              else
+                echo "::warning::KEYSTORE_BASE64 is missing matching KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD secrets; falling back to repository debug.keystore."
+              fi
+            else
+              echo "::warning::Failed to decode KEYSTORE_BASE64; falling back to repository debug.keystore."
+            fi
           else
-            echo "path=" >> "$GITHUB_OUTPUT"
             echo "No KEYSTORE_BASE64 secret set; using fallback debug keystore."
+          fi
+
+          if [ "$USE_CI_KEYSTORE" -eq 0 ]; then
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "store_password=" >> "$GITHUB_OUTPUT"
+            echo "key_alias=" >> "$GITHUB_OUTPUT"
+            echo "key_password=" >> "$GITHUB_OUTPUT"
             if [ -f debug.keystore.base64 ]; then
               tr -d '[:space:]' < debug.keystore.base64 | base64 -d > app/debug.keystore
             fi
@@ -64,9 +88,9 @@ jobs:
       - name: Build Android Debug APK
         env:
           KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.store_password }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
+          KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
           APP_VERSION_NAME: ${{ steps.tag.outputs.tag_name }}
           APP_VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon

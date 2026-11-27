@@ -15,7 +15,7 @@ android {
         versionName = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "1.0"
     }
 
-    val ciKeystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+    val ciKeystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() && file(it).exists() }
     val localDebugKeystore = file("debug.keystore")
     val hasCustomSigning = ciKeystorePath != null || localDebugKeystore.exists()
 
@@ -24,9 +24,9 @@ android {
             create("ci") {
                 if (ciKeystorePath != null) {
                     storeFile = file(ciKeystorePath)
-                    storePassword = System.getenv("KEYSTORE_PASSWORD")
-                    keyAlias = System.getenv("KEY_ALIAS")
-                    keyPassword = System.getenv("KEY_PASSWORD")
+                    storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
+                    keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
+                    keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
                 } else {
                     storeFile = localDebugKeystore
                     storePassword = "android"
