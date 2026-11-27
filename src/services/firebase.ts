@@ -89,6 +89,8 @@ declare global {
       openBrowserAuth?: () => void;
       installUpdate?: (downloadUrl: string) => void;
     };
+    __onUpdateProgress?: (percent: number) => void;
+    __onUpdateError?: (message: string) => void;
     __onNativeGoogleResult?: (
       idToken: string | null,
       error: string | null,

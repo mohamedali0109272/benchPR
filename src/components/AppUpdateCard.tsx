@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowDownToLine, CheckCircle2, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { checkLatestRelease, getActiveVersion, GitHubReleaseInfo, triggerAppUpdate } from '../services/appUpdater';
 import { useI18n } from '../i18n/I18nContext';
@@ -15,6 +15,27 @@ export const AppUpdateCard: React.FC<AppUpdateCardProps> = ({ compact = false })
   const [error, setError] = useState<string | null>(null);
   const [checkedOnce, setCheckedOnce] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.__onUpdateProgress = (percent: number) => {
+      setProgress(percent);
+      setInstallError(null);
+      if (percent >= 100) {
+        setInstalling(false);
+      }
+    };
+    window.__onUpdateError = (message: string) => {
+      setInstalling(false);
+      setProgress(null);
+      setInstallError(message);
+    };
+    return () => {
+      window.__onUpdateProgress = undefined;
+      window.__onUpdateError = undefined;
+    };
+  }, []);
 
   const handleCheckUpdate = async () => {
     setChecking(true);
@@ -34,12 +55,18 @@ export const AppUpdateCard: React.FC<AppUpdateCardProps> = ({ compact = false })
 
   const handleInstall = () => {
     if (!releaseInfo?.apkAsset?.downloadUrl) return;
+    setInstallError(null);
     setInstalling(true);
+    setProgress(0);
     triggerAppUpdate(releaseInfo.apkAsset.downloadUrl, releaseInfo.tagName);
-    setTimeout(() => {
-      setInstalling(false);
-      setCurrentVersion(getActiveVersion());
-    }, 4000);
+    if (!window.AndroidAuth?.installUpdate) {
+      // Browser: the download is handed to the browser, so there is no progress to wait for.
+      setTimeout(() => {
+        setInstalling(false);
+        setProgress(null);
+        setCurrentVersion(getActiveVersion());
+      }, 4000);
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -117,6 +144,7 @@ export const AppUpdateCard: React.FC<AppUpdateCardProps> = ({ compact = false })
           )}
 
           {releaseInfo.apkAsset ? (
+            <>
             <button
               type="button"
               onClick={handleInstall}
@@ -124,8 +152,18 @@ export const AppUpdateCard: React.FC<AppUpdateCardProps> = ({ compact = false })
               className="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-gradient-to-r from-[#FF2D55] to-[#FF6B8B] text-[#080A0F] text-xs font-black shadow-[0_0_16px_rgba(255,45,85,0.4)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60"
             >
               <ArrowDownToLine className="w-4 h-4 stroke-[2.5]" />
-              <span>{installing ? t('Starting Download...') : t('Download & Install Update')}</span>
+              <span>
+                {installing
+                  ? progress !== null && progress > 0
+                    ? `${t('Downloading...')} ${progress}%`
+                    : t('Starting Download...')
+                  : t('Download & Install Update')}
+              </span>
             </button>
+            {installError && (
+              <p className="text-[11px] font-medium text-[#FF2D55]">{installError}</p>
+            )}
+            </>
           ) : (
             <a
               href={releaseInfo.htmlUrl}

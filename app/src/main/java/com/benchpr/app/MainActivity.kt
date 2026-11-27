@@ -7,6 +7,11 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -42,6 +47,11 @@ class MainActivity : Activity() {
     @Volatile
     private var authServerSocket: ServerSocket? = null
     private val authServerExecutor = Executors.newSingleThreadExecutor()
+    private val updateExecutor = Executors.newSingleThreadExecutor()
+    @Volatile
+    private var updateInProgress = false
+    @Volatile
+    private var pendingUpdateApk: File? = null
 
     private val googleSignInClient: GoogleSignInClient by lazy {
         GoogleSignIn.getClient(
@@ -77,14 +87,7 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun installUpdate(downloadUrl: String) {
             runOnUiThread {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start install update", e)
-                }
+                startInAppUpdate(downloadUrl)
             }
         }
     }
@@ -222,6 +225,109 @@ class MainActivity : Activity() {
             launchBrowserAuth()
         } else {
             deliverGoogleResult(token, null)
+        }
+    }
+
+    private fun reportUpdateToJs(fnName: String, argJs: String) {
+        runOnUiThread {
+            if (::webView.isInitialized) {
+                webView.evaluateJavascript("window.$fnName && window.$fnName($argJs);", null)
+            }
+        }
+    }
+
+    /** Downloads the release APK inside the app, then hands it to Android's installer. */
+    private fun startInAppUpdate(downloadUrl: String) {
+        if (updateInProgress) return
+        updateInProgress = true
+        updateExecutor.execute {
+            val updatesDir = File(cacheDir, "updates").apply { mkdirs() }
+            val target = File(updatesDir, "benchpr-update.apk")
+            try {
+                downloadApk(downloadUrl, target) { pct ->
+                    reportUpdateToJs("__onUpdateProgress", pct.toString())
+                }
+                updateInProgress = false
+                pendingUpdateApk = target
+                runOnUiThread { installDownloadedApk() }
+            } catch (e: Exception) {
+                Log.e(TAG, "In-app update download failed", e)
+                target.delete()
+                updateInProgress = false
+                reportUpdateToJs("__onUpdateError", JSONObject.quote(e.message ?: "Download failed"))
+            }
+        }
+    }
+
+    private fun downloadApk(url: String, target: File, onProgress: (Int) -> Unit) {
+        val partial = File(target.parentFile, target.name + ".part")
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true
+            connectTimeout = 15_000
+            readTimeout = 30_000
+            setRequestProperty("Accept", "application/octet-stream")
+        }
+        try {
+            if (conn.responseCode !in 200..299) {
+                throw IOException("Download failed (HTTP ${conn.responseCode})")
+            }
+            val total = conn.contentLengthLong
+            conn.inputStream.use { input ->
+                partial.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var done = 0L
+                    var lastPct = -1
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        done += read
+                        if (total > 0) {
+                            val pct = ((done * 100) / total).toInt()
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(pct)
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            conn.disconnect()
+        }
+        if (target.exists()) target.delete()
+        if (!partial.renameTo(target)) throw IOException("Could not save the update file")
+    }
+
+    private fun installDownloadedApk() {
+        val apk = pendingUpdateApk ?: return
+        if (!packageManager.canRequestPackageInstalls()) {
+            // One-time permission: allow BenchPR to install apps. Return to the app afterwards.
+            val settingsIntent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:$packageName"),
+            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            startActivity(settingsIntent)
+            reportUpdateToJs(
+                "__onUpdateError",
+                JSONObject.quote("Allow BenchPR to install apps, then return to the app to finish the update."),
+            )
+            return
+        }
+        pendingUpdateApk = null
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(installIntent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Returning from the "install unknown apps" screen: continue the pending update.
+        if (pendingUpdateApk != null && packageManager.canRequestPackageInstalls()) {
+            installDownloadedApk()
         }
     }
 

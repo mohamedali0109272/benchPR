@@ -113,7 +113,8 @@ export async function checkLatestRelease(): Promise<GitHubReleaseInfo> {
 
 export function triggerAppUpdate(apkUrl: string, targetVersion?: string): void {
   if (window.AndroidAuth?.installUpdate) {
-    // On Android, the newly installed APK carries its own compiled VITE_APP_VERSION
+    // Android downloads and installs inside the app; progress arrives via __onUpdateProgress.
+    // The installed APK carries its own compiled VITE_APP_VERSION.
     window.AndroidAuth.installUpdate(apkUrl);
   } else {
     if (targetVersion) {
