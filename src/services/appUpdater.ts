@@ -14,13 +14,41 @@ export interface GitHubReleaseInfo {
   isNewer: boolean;
 }
 
-export const CURRENT_APP_VERSION = 'v1.0.20261126';
+export const CURRENT_APP_VERSION = import.meta.env.VITE_APP_VERSION || 'v1.0.20261126';
 const INSTALLED_VERSION_KEY = 'benchpr_installed_version';
 const GITHUB_REPO = 'mohamedali0109272/benchPR';
 
+function parseVersionParts(tag: string): number[] {
+  return tag
+    .replace(/^v/i, '')
+    .split('.')
+    .map((part) => parseInt(part, 10) || 0);
+}
+
+export function isReleaseNewer(remoteTag: string, currentTag: string): boolean {
+  if (!remoteTag || remoteTag === currentTag) return false;
+  const remote = parseVersionParts(remoteTag);
+  const current = parseVersionParts(currentTag);
+  const len = Math.max(remote.length, current.length);
+  for (let i = 0; i < len; i++) {
+    const r = remote[i] ?? 0;
+    const c = current[i] ?? 0;
+    if (r > c) return true;
+    if (r < c) return false;
+  }
+  return false;
+}
+
 export function getActiveVersion(): string {
+  if (import.meta.env.VITE_APP_VERSION) {
+    return import.meta.env.VITE_APP_VERSION;
+  }
   try {
-    return localStorage.getItem(INSTALLED_VERSION_KEY) || CURRENT_APP_VERSION;
+    const stored = localStorage.getItem(INSTALLED_VERSION_KEY);
+    if (stored && isReleaseNewer(stored, CURRENT_APP_VERSION)) {
+      return stored;
+    }
+    return CURRENT_APP_VERSION;
   } catch {
     return CURRENT_APP_VERSION;
   }
@@ -37,7 +65,7 @@ export function setActiveVersion(version: string): void {
 export async function checkLatestRelease(): Promise<GitHubReleaseInfo> {
   const current = getActiveVersion();
   const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-  
+
   const response = await fetch(url, {
     headers: {
       Accept: 'application/vnd.github.v3+json',
@@ -70,8 +98,7 @@ export async function checkLatestRelease(): Promise<GitHubReleaseInfo> {
     }
   }
 
-  // Compare version tag
-  const isNewer = Boolean(tagName && tagName !== current);
+  const isNewer = isReleaseNewer(tagName, current);
 
   return {
     tagName,
@@ -85,14 +112,13 @@ export async function checkLatestRelease(): Promise<GitHubReleaseInfo> {
 }
 
 export function triggerAppUpdate(apkUrl: string, targetVersion?: string): void {
-  if (targetVersion) {
-    setActiveVersion(targetVersion);
-  }
-
   if (window.AndroidAuth?.installUpdate) {
+    // On Android, the newly installed APK carries its own compiled VITE_APP_VERSION
     window.AndroidAuth.installUpdate(apkUrl);
   } else {
-    // On web or external browser, direct browser navigation downloads the APK file
+    if (targetVersion) {
+      setActiveVersion(targetVersion);
+    }
     window.location.href = apkUrl;
   }
 }

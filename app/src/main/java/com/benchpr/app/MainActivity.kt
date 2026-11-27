@@ -30,6 +30,8 @@ import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private var pageLoaded = false
+    private var pendingAuthResult: Triple<String?, String?, String?>? = null
 
     private val googleSignInClient: GoogleSignInClient by lazy {
         GoogleSignIn.getClient(
@@ -86,9 +88,10 @@ class MainActivity : Activity() {
         val data = intent?.data ?: return
         if (data.scheme == "benchpr" && data.host == "auth") {
             val idToken = data.getQueryParameter("idToken")
+            val accessToken = data.getQueryParameter("accessToken")
             val error = data.getQueryParameter("error")
-            Log.d(TAG, "Received deep link auth: hasToken=${idToken != null}, error=$error")
-            deliverGoogleResult(idToken, error)
+            Log.d(TAG, "Received deep link auth: hasIdToken=${idToken != null}, hasAccessToken=${accessToken != null}, error=$error")
+            deliverGoogleResult(idToken, error, accessToken)
         }
     }
 
@@ -137,12 +140,17 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun deliverGoogleResult(idToken: String?, error: String?) {
+    private fun deliverGoogleResult(idToken: String?, error: String?, accessToken: String? = null) {
+        if (!::webView.isInitialized || !pageLoaded) {
+            pendingAuthResult = Triple(idToken, error, accessToken)
+            return
+        }
         val tokenArg = idToken?.let { JSONObject.quote(it) } ?: "null"
         val errorArg = error?.let { JSONObject.quote(it) } ?: "null"
+        val accessTokenArg = accessToken?.let { JSONObject.quote(it) } ?: "null"
         runOnUiThread {
             webView.evaluateJavascript(
-                "window.__onNativeGoogleResult && window.__onNativeGoogleResult($tokenArg, $errorArg);",
+                "window.__onNativeGoogleResult && window.__onNativeGoogleResult($tokenArg, $errorArg, $accessTokenArg);",
                 null,
             )
         }
@@ -151,7 +159,6 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleAuthIntent(intent)
 
         val bgColor = Color.parseColor("#080A0F")
         window.setBackgroundDrawable(ColorDrawable(bgColor))
@@ -224,6 +231,16 @@ class MainActivity : Activity() {
                     }
                 }
 
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    pageLoaded = true
+                    val pending = pendingAuthResult
+                    if (pending != null) {
+                        pendingAuthResult = null
+                        deliverGoogleResult(pending.first, pending.second, pending.third)
+                    }
+                }
+
                 override fun onReceivedError(
                     view: WebView?,
                     request: WebResourceRequest?,
@@ -243,6 +260,7 @@ class MainActivity : Activity() {
             ),
         )
         webView.loadUrl("https://$APP_HOST/index.html")
+        handleAuthIntent(intent)
     }
 
     @Deprecated("Deprecated in Java")

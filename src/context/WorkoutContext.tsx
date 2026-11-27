@@ -3,8 +3,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { RankingEngine } from '../data/RankingEngine';
 import { Splits } from '../data/Splits';
-import { auth, db, onAuthStateChanged } from '../services/firebase';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, onAuthStateChanged, OperationType } from '../services/firebase';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, query, where } from 'firebase/firestore';
 import {
   computeBestBenchLifted,
   computeBestDeadliftLifted,
@@ -80,6 +80,60 @@ interface WorkoutContextValue {
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null);
 
+function sanitizeWorkoutForCloud(w: WorkoutWithSets, userId: string) {
+  return {
+    userId,
+    workoutLog: {
+      id: Number(w.workoutLog.id),
+      sessionId: Number(w.workoutLog.sessionId ?? 0),
+      sessionTitle: String(w.workoutLog.sessionTitle || 'Workout').slice(0, 200),
+      target1RM: Number(w.workoutLog.target1RM || 100),
+      unit: w.workoutLog.unit === 'lbs' ? 'lbs' : 'kg',
+      timestamp: Number(w.workoutLog.timestamp || Date.now()),
+      totalDurationSeconds: Number(w.workoutLog.totalDurationSeconds || 0),
+      isCompleted: Boolean(w.workoutLog.isCompleted),
+    },
+    sets: (Array.isArray(w.sets) ? w.sets : []).slice(0, 200).map((s) => ({
+      id: Number(s.id),
+      workoutLogId: Number(s.workoutLogId),
+      exerciseName: String(s.exerciseName || '').slice(0, 128),
+      setIndex: Number(s.setIndex),
+      targetWeight: Number(s.targetWeight || 0),
+      targetReps: Number(s.targetReps || 0),
+      actualWeight: Number(s.actualWeight || 0),
+      actualReps: Number(s.actualReps || 0),
+      isCompleted: Boolean(s.isCompleted),
+      accessories: Array.isArray(s.accessories) ? s.accessories : [],
+    })),
+  };
+}
+
+function buildUserCreatePayload(
+  user: { uid: string; email: string | null; displayName: string | null; photoURL: string | null },
+  p: StoredPreferences,
+) {
+  const payload: Record<string, unknown> = {
+    uid: user.uid,
+    email: (user.email || `${user.uid}@users.local`).slice(0, 256),
+    targetBench: p.target1RM,
+    targetSquat: p.targetSquat1RM,
+    targetDeadlift: p.targetDeadlift1RM,
+    weightUnit: p.weightUnit,
+    bodyweightKg: p.bodyweightKg,
+    createdAt: new Date().toISOString(),
+  };
+  if (user.displayName) {
+    payload.displayName = user.displayName.slice(0, 128);
+  }
+  if (user.photoURL) {
+    payload.photoURL = user.photoURL.slice(0, 512);
+  }
+  if (p.languageCode) {
+    payload.languageCode = p.languageCode.slice(0, 16);
+  }
+  return payload;
+}
+
 function buildActiveExercise(template: ExerciseTemplate, targetWeight: number): ActiveExerciseState {
   const sets: ExerciseSetState[] = Array.from({ length: template.totalSets }, (_, idx) => ({
     setIndex: idx + 1,
@@ -105,67 +159,83 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [timerTotalSeconds, setTimerTotalSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const timerIntervalRef = useRef<number | null>(null);
+  const prefsRef = useRef<StoredPreferences>(prefs);
+  prefsRef.current = prefs;
 
   const language = useMemo(() => resolveLanguage(prefs.languageCode), [prefs.languageCode]);
 
   // Sync with Firestore when auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          // Sync user profile & prefs
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            const cloudPrefs: StoredPreferences = {
-              target1RM: data.targetBench ?? prefs.target1RM,
-              targetSquat1RM: data.targetSquat ?? prefs.targetSquat1RM,
-              targetDeadlift1RM: data.targetDeadlift ?? prefs.targetDeadlift1RM,
-              weightUnit: data.weightUnit ?? prefs.weightUnit,
-              bodyweightKg: data.bodyweightKg ?? prefs.bodyweightKg,
-              languageCode: data.languageCode ?? prefs.languageCode,
-            };
-            setPrefs(cloudPrefs);
-            savePreferences(cloudPrefs);
-          } else {
-            await setDoc(userRef, {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-              targetBench: prefs.target1RM,
-              targetSquat: prefs.targetSquat1RM,
-              targetDeadlift: prefs.targetDeadlift1RM,
-              weightUnit: prefs.weightUnit,
-              bodyweightKg: prefs.bodyweightKg,
-              languageCode: prefs.languageCode,
-              createdAt: new Date().toISOString(),
-            });
-          }
+      if (!user) return;
+      const currentPrefs = prefsRef.current;
 
-          // Sync workouts
-          const workoutsRef = collection(db, 'workouts');
-          const q = query(workoutsRef, where('userId', '==', user.uid));
-          const querySnap = await getDocs(q);
-          if (!querySnap.empty) {
-            const cloudWorkouts: WorkoutWithSets[] = querySnap.docs.map((d) => d.data() as WorkoutWithSets);
-            const sorted = cloudWorkouts.sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
-            setHistoryWorkouts(sorted);
-            saveWorkoutsList(sorted);
-          } else {
-            // Upload local workouts to cloud
-            const local = loadWorkouts();
-            for (const w of local) {
-              await setDoc(doc(db, 'workouts', String(w.workoutLog.id)), {
-                ...w,
-                userId: user.uid,
-              });
+      // Sync user profile & prefs
+      const userPath = `users/${user.uid}`;
+      const userRef = doc(db, 'users', user.uid);
+      try {
+        let userSnap;
+        try {
+          userSnap = await getDoc(userRef);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.GET, userPath);
+        }
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          const cloudPrefs: StoredPreferences = {
+            target1RM: typeof data.targetBench === 'number' && data.targetBench > 0 ? data.targetBench : currentPrefs.target1RM,
+            targetSquat1RM: typeof data.targetSquat === 'number' && data.targetSquat > 0 ? data.targetSquat : currentPrefs.targetSquat1RM,
+            targetDeadlift1RM: typeof data.targetDeadlift === 'number' && data.targetDeadlift > 0 ? data.targetDeadlift : currentPrefs.targetDeadlift1RM,
+            weightUnit: data.weightUnit === 'lbs' ? 'lbs' : data.weightUnit === 'kg' ? 'kg' : currentPrefs.weightUnit,
+            bodyweightKg: typeof data.bodyweightKg === 'number' && data.bodyweightKg >= 20 && data.bodyweightKg <= 400 ? data.bodyweightKg : currentPrefs.bodyweightKg,
+            languageCode: typeof data.languageCode === 'string' ? data.languageCode : currentPrefs.languageCode,
+          };
+          setPrefs(cloudPrefs);
+          savePreferences(cloudPrefs);
+        } else {
+          try {
+            await setDoc(userRef, buildUserCreatePayload(user, currentPrefs));
+          } catch (err) {
+            handleFirestoreError(err, OperationType.CREATE, userPath);
+          }
+        }
+
+        // Sync workouts
+        const workoutsRef = collection(db, 'workouts');
+        const q = query(workoutsRef, where('userId', '==', user.uid));
+        let querySnap;
+        try {
+          querySnap = await getDocs(q);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.LIST, 'workouts');
+        }
+
+        if (!querySnap.empty) {
+          const cloudWorkouts: WorkoutWithSets[] = querySnap.docs.map((d) => {
+            const raw = d.data() as WorkoutWithSets;
+            return {
+              workoutLog: raw.workoutLog,
+              sets: Array.isArray(raw.sets) ? raw.sets : [],
+            };
+          });
+          const sorted = cloudWorkouts.sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
+          setHistoryWorkouts(sorted);
+          saveWorkoutsList(sorted);
+        } else {
+          // Upload local workouts to cloud
+          const local = loadWorkouts();
+          for (const w of local) {
+            const workoutId = String(w.workoutLog.id);
+            try {
+              await setDoc(doc(db, 'workouts', workoutId), sanitizeWorkoutForCloud(w, user.uid));
+            } catch (err) {
+              handleFirestoreError(err, OperationType.CREATE, `workouts/${workoutId}`);
             }
           }
-        } catch (err) {
-          console.error('Firestore sync error on login:', err);
         }
+      } catch (err) {
+        console.error('Firestore sync error on login:', err);
       }
     });
     return () => unsubscribe();
@@ -177,19 +247,39 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       savePreferences(next);
       const user = auth.currentUser;
       if (user) {
-        setDoc(
-          doc(db, 'users', user.uid),
-          {
-            targetBench: next.target1RM,
-            targetSquat: next.targetSquat1RM,
-            targetDeadlift: next.targetDeadlift1RM,
-            weightUnit: next.weightUnit,
-            bodyweightKg: next.bodyweightKg,
-            languageCode: next.languageCode,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        ).catch((err) => console.error('Failed to sync prefs to Firestore:', err));
+        const userRef = doc(db, 'users', user.uid);
+        const updatePayload: {
+          targetBench: number;
+          targetSquat: number;
+          targetDeadlift: number;
+          weightUnit: WeightUnit;
+          bodyweightKg: number;
+          updatedAt: string;
+          languageCode?: string;
+        } = {
+          targetBench: next.target1RM,
+          targetSquat: next.targetSquat1RM,
+          targetDeadlift: next.targetDeadlift1RM,
+          weightUnit: next.weightUnit,
+          bodyweightKg: next.bodyweightKg,
+          updatedAt: new Date().toISOString(),
+        };
+        if (next.languageCode) {
+          updatePayload.languageCode = next.languageCode.slice(0, 16);
+        }
+        updateDoc(userRef, updatePayload).catch(async (err) => {
+          // If document does not exist yet, create it cleanly
+          const code = (err as { code?: string })?.code;
+          if (code === 'not-found') {
+            try {
+              await setDoc(userRef, buildUserCreatePayload(user, next));
+            } catch (createErr) {
+              console.error('Failed to create user profile in Firestore:', createErr);
+            }
+          } else {
+            console.error('Failed to sync prefs to Firestore:', err);
+          }
+        });
       }
       return next;
     });
@@ -588,10 +678,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const user = auth.currentUser;
       if (user && nextWorkouts.length > 0) {
         const latest = nextWorkouts[0];
-        setDoc(doc(db, 'workouts', String(latest.workoutLog.id)), {
-          ...latest,
-          userId: user.uid,
-        }).catch((err) => console.error('Failed to save workout to Firestore:', err));
+        const workoutId = String(latest.workoutLog.id);
+        setDoc(doc(db, 'workouts', workoutId), sanitizeWorkoutForCloud(latest, user.uid)).catch((err) => {
+          console.error('Failed to save workout to Firestore:', err);
+        });
       }
 
       setActiveWorkout(null);

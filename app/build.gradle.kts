@@ -11,26 +11,35 @@ android {
         applicationId = "com.benchpr.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "1.0"
     }
 
-    val ciKeystorePath: String? = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+    val ciKeystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+    val localDebugKeystore = file("debug.keystore")
+    val hasCustomSigning = ciKeystorePath != null || localDebugKeystore.exists()
 
-    if (ciKeystorePath != null) {
-        signingConfigs {
+    signingConfigs {
+        if (hasCustomSigning) {
             create("ci") {
-                storeFile = file(ciKeystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                if (ciKeystorePath != null) {
+                    storeFile = file(ciKeystorePath)
+                    storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("KEY_ALIAS")
+                    keyPassword = System.getenv("KEY_PASSWORD")
+                } else {
+                    storeFile = localDebugKeystore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
             }
         }
     }
 
     buildTypes {
         debug {
-            if (ciKeystorePath != null) {
+            if (hasCustomSigning) {
                 signingConfig = signingConfigs.getByName("ci")
             }
         }
