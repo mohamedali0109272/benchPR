@@ -315,6 +315,7 @@ class MainActivity : Activity() {
             return
         }
         pendingUpdateApk = null
+        reportUpdateToJs("__onUpdateProgress", "100")
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
         val installIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
