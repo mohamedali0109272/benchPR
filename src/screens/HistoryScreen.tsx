@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, ChevronDown, History, List, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronDown, History, List, Shield, Trash2 } from 'lucide-react';
 import { WorkoutCalendarView } from '../components/WorkoutCalendarView';
 import { useWorkout } from '../context/WorkoutContext';
 import { formatPlainWeight } from '../data/RankingEngine';
@@ -129,6 +129,15 @@ const WorkoutHistoryCard: React.FC<WorkoutHistoryCardProps> = ({
     }
   }, [locale, workoutLog.timestamp]);
 
+  const avgRpe = useMemo(() => {
+    const scored = sets.filter(
+      (s) => s.isCompleted && typeof s.rpe === 'number' && Number.isFinite(s.rpe),
+    );
+    if (scored.length === 0) return null;
+    const sum = scored.reduce((acc, s) => acc + (s.rpe ?? 0), 0);
+    return Math.round((sum / scored.length) * 10) / 10;
+  }, [sets]);
+
   const groupedByExercise = useMemo(() => {
     const map = new Map<string, ExerciseSetLogEntity[]>();
     for (const s of sets) {
@@ -183,6 +192,11 @@ const WorkoutHistoryCard: React.FC<WorkoutHistoryCardProps> = ({
         <span className="text-[#00E676] font-mono-num">
           {t(`Duration: ${durationMinutes}m`)}
         </span>
+        {avgRpe !== null && (
+          <span className="text-[#FFC21A] font-mono-num">
+            {t(`Avg RPE: ${avgRpe}`)}
+          </span>
+        )}
       </div>
 
       <div className="accordion-content" data-open={expanded ? 'true' : 'false'}>
@@ -192,23 +206,54 @@ const WorkoutHistoryCard: React.FC<WorkoutHistoryCardProps> = ({
               <div key={exerciseName} className="space-y-1.5">
                 <div className="text-xs font-bold text-[#00E5FF]">{t(exerciseName)}</div>
                 <div className="space-y-1 ps-2">
-                  {setLogs.map((set) => (
-                    <div
-                      key={set.id}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className={set.isCompleted ? 'text-[#F0F6FC]' : 'text-[#6E7681]'}>
-                        {t(
-                          `Set ${set.setIndex}: ${formatPlainWeight(set.actualWeight)} ${workoutLog.unit} x ${set.actualReps} reps`,
+                  {setLogs.map((set) => {
+                    const hasRpe = typeof set.rpe === 'number' && Number.isFinite(set.rpe);
+                    const rpeBadgeClass =
+                      (set.rpe ?? 0) >= 9
+                        ? 'bg-[#FF2D55]/15 border-[#FF2D55]/40 text-[#FF6B8B]'
+                        : (set.rpe ?? 0) >= 7.5
+                          ? 'bg-[#FFC21A]/15 border-[#FFC21A]/40 text-[#FFC21A]'
+                          : 'bg-[#00E5FF]/15 border-[#00E5FF]/40 text-[#00E5FF]';
+
+                    return (
+                      <div key={set.id} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className={set.isCompleted ? 'text-[#F0F6FC]' : 'text-[#6E7681]'}>
+                            {t(
+                              `Set ${set.setIndex}: ${formatPlainWeight(set.actualWeight)} ${workoutLog.unit} x ${set.actualReps} reps`,
+                            )}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {hasRpe && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded border text-[10px] font-bold font-mono-num ${rpeBadgeClass}`}
+                              >
+                                {t('RPE')} {set.rpe}
+                              </span>
+                            )}
+                            {set.isCompleted && (
+                              <span className="text-[11px] font-bold text-[#00E676]">
+                                {t('Completed')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {Array.isArray(set.accessories) && set.accessories.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 ps-1">
+                            {set.accessories.map((acc) => (
+                              <span
+                                key={acc}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FF2D55]/15 border border-[#FF2D55]/30 text-[10px] font-semibold text-[#FF6B8B]"
+                              >
+                                <Shield className="w-2.5 h-2.5" />
+                                <span>{t(acc)}</span>
+                              </span>
+                            ))}
+                          </div>
                         )}
-                      </span>
-                      {set.isCompleted && (
-                        <span className="text-[11px] font-bold text-[#00E676]">
-                          {t('Completed')}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

@@ -123,23 +123,23 @@ export interface WorkoutSplit {
   days: SplitDay[];
 }
 
-export type LiftingAccessory =
-  | 'Belt'
-  | 'Wrist Wraps'
-  | 'Elbow Wraps'
-  | 'Knee Wraps'
-  | 'Knee Sleeves'
-  | 'Lifting Straps'
-  | 'Chalk';
+export type LiftingAccessory = string;
 
-export const ALL_LIFTING_ACCESSORIES: LiftingAccessory[] = [
+export const ALL_LIFTING_ACCESSORIES: string[] = [
   'Belt',
   'Wrist Wraps',
   'Elbow Wraps',
+  'Elbow Sleeves',
   'Knee Wraps',
   'Knee Sleeves',
   'Lifting Straps',
+  'Singlet',
+  'Lifting Shoes',
   'Chalk',
+  'Smelling Salts',
+  'Bench Shirt',
+  'Squat Suit',
+  'Deadlift Suit',
 ];
 
 export interface ExerciseSetState {
@@ -150,6 +150,7 @@ export interface ExerciseSetState {
   actualReps: number;
   isCompleted: boolean;
   durationSeconds: number;
+  rpe?: number;
   accessories?: LiftingAccessory[];
 }
 
@@ -191,6 +192,7 @@ export interface ExerciseSetLogEntity {
   actualWeight: number;
   actualReps: number;
   isCompleted: boolean;
+  rpe?: number;
   accessories?: LiftingAccessory[];
 }
 

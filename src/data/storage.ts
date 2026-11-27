@@ -11,6 +11,7 @@ import {
 
 const PREFS_KEY = 'benchpr_prefs_v1';
 const WORKOUTS_KEY = 'benchpr_workouts_v1';
+const CUSTOM_ACCESSORIES_KEY = 'benchpr_custom_accessories_v1';
 
 export interface StoredPreferences {
   target1RM: number;
@@ -87,6 +88,28 @@ export function saveWorkoutsList(workouts: WorkoutWithSets[]): void {
   }
 }
 
+export function loadCustomAccessories(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_ACCESSORIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => String(item).trim().slice(0, 40))
+      .filter((item) => item.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomAccessories(items: string[]): void {
+  try {
+    localStorage.setItem(CUSTOM_ACCESSORIES_KEY, JSON.stringify(items));
+  } catch {
+    // Ignore storage quota issues
+  }
+}
+
 export function insertWorkout(
   current: WorkoutWithSets[],
   log: Omit<WorkoutLogEntity, 'id'>,
@@ -114,7 +137,7 @@ export function deleteWorkoutById(current: WorkoutWithSets[], logId: number): Wo
 
 export const BENCH_NAMES = new Set(['Heavy Single', 'Bench press', 'Bench Press', 'Paused Bench']);
 export const SQUAT_NAMES = new Set(['Barbell Squat', 'Front Squat']);
-export const DEADLIFT_NAMES = new Set(['Deadlift', 'Romanian Deadlift']);
+export const DEADLIFT_NAMES = new Set(['Deadlift', 'Sumo Deadlift', 'Romanian Deadlift', 'Stiff-Legged Deadlift']);
 
 function computeBestByNames(workouts: WorkoutWithSets[], names: Set<string>): number | null {
   let max: number | null = null;

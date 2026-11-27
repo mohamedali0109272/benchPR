@@ -82,6 +82,7 @@ const rules: Rule[] = [
   },
   { regex: /^Target 1RM: (.+)$/i, build: (g, tr) => `1RM المستهدف: ${tr(g[0])}` },
   { regex: /^Duration: (\d+)m$/i, build: (g) => `المدة: ${g[0]} د` },
+  { regex: /^Avg RPE: (.+)$/i, build: (g) => `متوسط الجهد (RPE): ${g[0]}` },
   { regex: /^Main goal: (.+)$/i, build: (g, tr) => `الهدف الأساسي: ${tr(g[0])}` },
   { regex: /^Goal: (.+)$/i, build: (g, tr) => `الهدف: ${tr(g[0])}` },
   { regex: /^(\d+) \/ (\d+) sets done$/i, build: (g) => `تم إنجاز ${g[0]} من ${g[1]} مجموعة` },

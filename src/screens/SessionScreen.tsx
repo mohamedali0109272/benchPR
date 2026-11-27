@@ -36,13 +36,17 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
 }) => {
   const {
     activeWorkout,
+    customAccessories,
     timerSecondsRemaining,
     timerTotalSeconds,
     isTimerRunning,
     toggleSetCompletion,
     updateSetWeight,
     updateSetReps,
+    updateSetRpe,
     toggleSetAccessory,
+    applyExerciseAccessories,
+    addCustomAccessory,
     startTimer,
     stopTimer,
     addSet,
@@ -159,10 +163,14 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
               key={exerciseState.template.id}
               exerciseState={exerciseState}
               unit={activeWorkout.unit}
+              availableAccessories={[...ALL_LIFTING_ACCESSORIES, ...customAccessories.filter((c) => !ALL_LIFTING_ACCESSORIES.some((p) => p.toLowerCase() === c.toLowerCase()))]}
               onToggleSet={(sIdx) => toggleSetCompletion(eIdx, sIdx)}
               onUpdateWeight={(sIdx, w) => updateSetWeight(eIdx, sIdx, w)}
               onUpdateReps={(sIdx, r) => updateSetReps(eIdx, sIdx, r)}
+              onUpdateRpe={(sIdx, rpe) => updateSetRpe(eIdx, sIdx, rpe)}
               onToggleAccessory={(sIdx, acc) => toggleSetAccessory(eIdx, sIdx, acc)}
+              onApplyAccessoriesToAll={(accs) => applyExerciseAccessories(eIdx, accs)}
+              onAddCustomAccessory={addCustomAccessory}
               onStartHoldTimer={(duration) => startTimer(duration)}
               onAddSet={() => addSet(eIdx)}
               onRemoveSet={() => removeSet(eIdx, exerciseState.sets.length - 1)}
@@ -300,10 +308,14 @@ const TimerCard: React.FC<TimerCardProps> = ({
 interface ExerciseLoggingCardProps {
   exerciseState: ActiveExerciseState;
   unit: WeightUnit;
+  availableAccessories: string[];
   onToggleSet: (setIndex: number) => void;
   onUpdateWeight: (setIndex: number, weight: number) => void;
   onUpdateReps: (setIndex: number, reps: number) => void;
+  onUpdateRpe: (setIndex: number, rpe: number | undefined) => void;
   onToggleAccessory: (setIndex: number, accessory: LiftingAccessory) => void;
+  onApplyAccessoriesToAll: (accessories: LiftingAccessory[]) => void;
+  onAddCustomAccessory: (name: string) => void;
   onStartHoldTimer: (duration: number) => void;
   onAddSet: () => void;
   onRemoveSet: () => void;
@@ -313,10 +325,14 @@ interface ExerciseLoggingCardProps {
 const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
   exerciseState,
   unit,
+  availableAccessories,
   onToggleSet,
   onUpdateWeight,
   onUpdateReps,
+  onUpdateRpe,
   onToggleAccessory,
+  onApplyAccessoriesToAll,
+  onAddCustomAccessory,
   onStartHoldTimer,
   onAddSet,
   onRemoveSet,
@@ -388,12 +404,17 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
             key={set.setIndex}
             set={set}
             setNumber={setIndex + 1}
+            hasMultipleSets={sets.length > 1}
             isStaticHold={template.isStaticHold}
             unit={unit}
+            availableAccessories={availableAccessories}
             onToggle={() => onToggleSet(setIndex)}
             onWeightChange={(w) => onUpdateWeight(setIndex, w)}
             onRepsChange={(r) => onUpdateReps(setIndex, r)}
+            onRpeChange={(rpe) => onUpdateRpe(setIndex, rpe)}
             onToggleAccessory={(acc) => onToggleAccessory(setIndex, acc)}
+            onApplyToAll={(accs) => onApplyAccessoriesToAll(accs)}
+            onAddCustomAccessory={onAddCustomAccessory}
           />
         ))}
       </div>
@@ -424,32 +445,77 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
   );
 };
 
+const RPE_PRESETS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+
+function rpeStyle(rpe: number | undefined): { border: string; text: string; bg: string } {
+  if (typeof rpe !== 'number') {
+    return {
+      border: 'border-white/10',
+      text: 'text-[#8B949E]',
+      bg: 'bg-[#161B24]',
+    };
+  }
+  if (rpe >= 9) {
+    return {
+      border: 'border-[#FF2D55]/70',
+      text: 'text-[#FF6B8B]',
+      bg: 'bg-[#FF2D55]/15',
+    };
+  }
+  if (rpe >= 7.5) {
+    return {
+      border: 'border-[#FFC21A]/70',
+      text: 'text-[#FFC21A]',
+      bg: 'bg-[#FFC21A]/15',
+    };
+  }
+  return {
+    border: 'border-[#00E5FF]/60',
+    text: 'text-[#00E5FF]',
+    bg: 'bg-[#00E5FF]/15',
+  };
+}
+
 interface SetLoggingRowProps {
   set: ExerciseSetState;
   setNumber: number;
+  hasMultipleSets: boolean;
   isStaticHold: boolean;
   unit: WeightUnit;
+  availableAccessories: string[];
   onToggle: () => void;
   onWeightChange: (weight: number) => void;
   onRepsChange: (reps: number) => void;
+  onRpeChange: (rpe: number | undefined) => void;
   onToggleAccessory: (accessory: LiftingAccessory) => void;
+  onApplyToAll: (accessories: LiftingAccessory[]) => void;
+  onAddCustomAccessory: (name: string) => void;
 }
 
 const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
   set,
   setNumber,
+  hasMultipleSets,
   isStaticHold,
   unit,
+  availableAccessories,
   onToggle,
   onWeightChange,
   onRepsChange,
+  onRpeChange,
   onToggleAccessory,
+  onApplyToAll,
+  onAddCustomAccessory,
 }) => {
   const { t } = useI18n();
   const [weightText, setWeightText] = useState(formatPlainWeight(set.actualWeight));
   const [repsText, setRepsText] = useState(String(set.actualReps));
+  const [rpeText, setRpeText] = useState(typeof set.rpe === 'number' ? String(set.rpe) : '');
   const [lastSyncedWeight, setLastSyncedWeight] = useState(set.actualWeight);
+  const [lastSyncedRpe, setLastSyncedRpe] = useState<number | undefined>(set.rpe);
   const [showAccessoriesMenu, setShowAccessoriesMenu] = useState(false);
+  const [showRpeMenu, setShowRpeMenu] = useState(false);
+  const [customInput, setCustomInput] = useState('');
 
   if (set.actualWeight !== lastSyncedWeight) {
     setLastSyncedWeight(set.actualWeight);
@@ -458,7 +524,27 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
     }
   }
 
+  if (set.rpe !== lastSyncedRpe) {
+    setLastSyncedRpe(set.rpe);
+    setRpeText(typeof set.rpe === 'number' ? String(set.rpe) : '');
+  }
+
   const activeAccessories = set.accessories ?? [];
+  const rpeTone = rpeStyle(set.rpe);
+
+  const handleAddCustom = () => {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    const existing = availableAccessories.find((a) => a.toLowerCase() === trimmed.toLowerCase());
+    const targetName = existing ?? trimmed.slice(0, 40);
+    if (!existing) {
+      onAddCustomAccessory(targetName);
+    }
+    if (!activeAccessories.includes(targetName)) {
+      onToggleAccessory(targetName);
+    }
+    setCustomInput('');
+  };
 
   return (
     <div
@@ -470,7 +556,7 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
     >
       <div
         onClick={onToggle}
-        className="flex items-center justify-between gap-2 sm:gap-4 px-3 py-2.5 cursor-pointer select-none"
+        className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 py-2.5 cursor-pointer select-none"
       >
         <div className="flex items-center gap-2.5 shrink-0">
           <button
@@ -496,45 +582,19 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
           >
             {t(`SET ${setNumber}`)}
           </span>
-
-          {/* Accessory summary pill if any selected */}
-          {activeAccessories.length > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAccessoriesMenu(!showAccessoriesMenu);
-              }}
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FF2D55]/15 border border-[#FF2D55]/40 text-[10px] font-bold text-[#FF2D55] cursor-pointer"
-            >
-              <Shield className="w-3 h-3" />
-              <span>{activeAccessories.join(', ')}</span>
-            </button>
-          )}
         </div>
 
+        {/* Weight x Reps / Duration */}
         <div
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 ms-auto sm:ms-0 sm:order-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            onClick={() => setShowAccessoriesMenu(!showAccessoriesMenu)}
-            title={t('Toggle Lifting Accessories')}
-            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-              activeAccessories.length > 0
-                ? 'bg-[#FF2D55]/20 border-[#FF2D55] text-[#FF2D55]'
-                : 'bg-[#161B24] border-white/10 text-[#8B949E] hover:text-[#F0F6FC]'
-            }`}
-          >
-            <Shield className="w-4 h-4" />
-          </button>
-
           <div className="relative flex items-center">
             <input
               type="number"
               step="0.5"
               min="0"
+              aria-label={`${t(`SET ${setNumber}`)} ${t(unit)}`}
               value={weightText}
               onChange={(e) => {
                 const str = e.target.value;
@@ -562,6 +622,7 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
             <input
               type="number"
               min="0"
+              aria-label={`${t(`SET ${setNumber}`)} reps`}
               value={repsText}
               onChange={(e) => {
                 const str = e.target.value;
@@ -575,28 +636,208 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
             />
           )}
         </div>
+
+        {/* Gear & RPE Controls */}
+        <div
+          className="w-full sm:w-auto sm:order-2 sm:ms-auto flex items-center justify-between sm:justify-end gap-2 pt-1.5 sm:pt-0 border-t border-white/[0.06] sm:border-t-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setShowAccessoriesMenu((prev) => !prev);
+              setShowRpeMenu(false);
+            }}
+            title={t('Toggle Lifting Accessories')}
+            className={`px-2 py-1.5 rounded-lg border flex items-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
+              activeAccessories.length > 0
+                ? 'bg-[#FF2D55]/20 border-[#FF2D55] text-[#FF6B8B]'
+                : 'bg-[#161B24] border-white/10 text-[#8B949E] hover:text-[#F0F6FC]'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>{activeAccessories.length > 0 ? activeAccessories.length : t('Gear')}</span>
+          </button>
+
+          <div
+            className={`inline-flex items-center rounded-lg border transition-all overflow-hidden ${rpeTone.bg} ${rpeTone.border}`}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setShowRpeMenu((prev) => !prev);
+                setShowAccessoriesMenu(false);
+              }}
+              title={t('Rate of Perceived Exertion (RPE)')}
+              className={`px-2 py-1.5 text-[10px] font-extrabold tracking-wider border-e border-white/10 hover:brightness-125 cursor-pointer ${rpeTone.text}`}
+            >
+              {t('RPE')}
+            </button>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              step="0.5"
+              placeholder="—"
+              aria-label={`${t(`SET ${setNumber}`)} ${t('RPE')}`}
+              value={rpeText}
+              onChange={(e) => {
+                const str = e.target.value;
+                setRpeText(str);
+                if (str.trim() === '') {
+                  setLastSyncedRpe(undefined);
+                  onRpeChange(undefined);
+                  return;
+                }
+                const parsed = parseFloat(str.replace(',', '.'));
+                if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 10) {
+                  const snapped = Math.round(parsed * 2) / 2;
+                  setLastSyncedRpe(snapped);
+                  onRpeChange(snapped);
+                }
+              }}
+              onBlur={() => {
+                if (rpeText.trim() === '') {
+                  onRpeChange(undefined);
+                  return;
+                }
+                const parsed = parseFloat(rpeText.replace(',', '.'));
+                if (!Number.isFinite(parsed)) {
+                  setRpeText(typeof set.rpe === 'number' ? String(set.rpe) : '');
+                  return;
+                }
+                const clamped = Math.min(10, Math.max(1, Math.round(parsed * 2) / 2));
+                setLastSyncedRpe(clamped);
+                setRpeText(String(clamped));
+                onRpeChange(clamped);
+              }}
+              className={`w-11 py-1.5 px-1 bg-transparent text-xs font-bold font-mono-num text-center focus:outline-none placeholder-[#6E7681] ${
+                typeof set.rpe === 'number' ? 'text-[#F0F6FC]' : 'text-[#8B949E]'
+              }`}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Selected accessories always visible on mobile and desktop */}
+      {activeAccessories.length > 0 && !showAccessoriesMenu && (
+        <div
+          className="px-3 pb-2 flex flex-wrap items-center gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAccessoriesMenu(true);
+            setShowRpeMenu(false);
+          }}
+        >
+          {activeAccessories.map((acc) => (
+            <span
+              key={acc}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FF2D55]/15 border border-[#FF2D55]/35 text-[10px] font-bold text-[#FF6B8B]"
+            >
+              <Shield className="w-2.5 h-2.5" />
+              <span>{t(acc)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* RPE Quick-Pick Drawer */}
+      {showRpeMenu && (
+        <div
+          className="px-3 py-2.5 bg-[#080B12] border-t border-white/10 space-y-2 animate-enter"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold tracking-wider text-[#8B949E] uppercase">
+              {t('Rate of Perceived Exertion (RPE)')}
+            </span>
+            <div className="flex items-center gap-3">
+              {typeof set.rpe === 'number' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLastSyncedRpe(undefined);
+                    setRpeText('');
+                    onRpeChange(undefined);
+                  }}
+                  className="text-[10px] text-[#FF6B8B] font-bold hover:underline cursor-pointer"
+                >
+                  {t('Clear')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowRpeMenu(false)}
+                className="text-[10px] text-[#00E5FF] font-bold hover:underline cursor-pointer"
+              >
+                {t('Done')}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {RPE_PRESETS.map((score) => {
+              const active = set.rpe === score;
+              const tone = rpeStyle(score);
+              return (
+                <button
+                  key={score}
+                  type="button"
+                  onClick={() => {
+                    const next = active ? undefined : score;
+                    setLastSyncedRpe(next);
+                    setRpeText(next !== undefined ? String(next) : '');
+                    onRpeChange(next);
+                    if (next !== undefined) {
+                      setShowRpeMenu(false);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono-num border transition-all cursor-pointer ${
+                    active
+                      ? `${tone.bg} ${tone.border} ${tone.text} shadow-sm`
+                      : 'bg-[#161B24] text-[#8B949E] border-white/10 hover:border-white/25 hover:text-[#F0F6FC]'
+                  }`}
+                >
+                  {score}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Accessories Selection Drawer */}
       {showAccessoriesMenu && (
         <div
-          className="px-3 py-2 bg-[#080B12] border-t border-white/10 space-y-1.5 animate-enter"
+          className="px-3 py-2.5 bg-[#080B12] border-t border-white/10 space-y-2.5 animate-enter"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold tracking-wider text-[#8B949E] uppercase">
               {t('Lifting Accessories & Gear')}
             </span>
-            <button
-              type="button"
-              onClick={() => setShowAccessoriesMenu(false)}
-              className="text-[10px] text-[#00E5FF] font-bold hover:underline cursor-pointer"
-            >
-              {t('Done')}
-            </button>
+            <div className="flex items-center gap-3">
+              {hasMultipleSets && (
+                <button
+                  type="button"
+                  onClick={() => onApplyToAll(activeAccessories)}
+                  className="text-[10px] text-[#00E676] font-bold hover:underline cursor-pointer"
+                >
+                  {t('Apply to all sets')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAccessoriesMenu(false)}
+                className="text-[10px] text-[#00E5FF] font-bold hover:underline cursor-pointer"
+              >
+                {t('Done')}
+              </button>
+            </div>
           </div>
+
           <div className="flex flex-wrap gap-1.5">
-            {ALL_LIFTING_ACCESSORIES.map((acc) => {
+            {availableAccessories.map((acc) => {
               const active = activeAccessories.includes(acc);
               return (
                 <button
@@ -613,6 +854,31 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          <div className="flex items-center gap-2 pt-0.5">
+            <input
+              type="text"
+              value={customInput}
+              maxLength={40}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddCustom();
+                }
+              }}
+              placeholder={t('Add custom gear...')}
+              className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg bg-[#161B24] border border-white/10 text-xs text-[#F0F6FC] placeholder-[#6E7681] focus:outline-none focus:border-[#00E5FF]"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustom}
+              disabled={!customInput.trim()}
+              className="px-3 py-1.5 rounded-lg bg-[#00E5FF]/15 border border-[#00E5FF]/40 text-xs font-bold text-[#00E5FF] hover:bg-[#00E5FF]/25 disabled:opacity-40 cursor-pointer shrink-0"
+            >
+              {t('Add')}
+            </button>
           </div>
         </div>
       )}

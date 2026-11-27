@@ -60,7 +60,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                 <AppLogo className="w-4 h-4" />
               </span>
               <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#F0F6FC]">
-                {t('BENCH PR TRACKER')}
+                {t('PR TRACKER')}
               </span>
             </button>
 

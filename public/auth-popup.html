@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BenchPR - Google Sign-in</title>
+  <title>PR TRACKER - Google Sign-in</title>
   <style>
     body {
       margin: 0;
@@ -124,7 +124,7 @@
       if (!idToken && !accessToken) {
         throw new Error("Google sign-in did not return an OAuth credential.");
       }
-      status.textContent = "Sign-in successful! Returning to BenchPR...";
+      status.textContent = "Sign-in successful! Returning to PR TRACKER...";
       status.className = "status";
       const params = new URLSearchParams();
       if (idToken) params.set("idToken", idToken);
@@ -174,11 +174,11 @@
 <body>
   <div class="card">
     <div class="badge">PR</div>
-    <h1>BenchPR Tracker</h1>
+    <h1>PR TRACKER</h1>
     <p>Sign in with your Google Account to sync workouts and PRs across all your devices.</p>
     <button id="signInBtn">Continue with Google</button>
     <div id="status" class="status"></div>
-    <a id="manualLink" class="manual-link">Open BenchPR App</a>
+    <a id="manualLink" class="manual-link">Open PR TRACKER</a>
   </div>
 </body>
 </html>

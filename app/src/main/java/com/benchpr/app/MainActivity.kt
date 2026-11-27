@@ -310,7 +310,7 @@ class MainActivity : Activity() {
             startActivity(settingsIntent)
             reportUpdateToJs(
                 "__onUpdateError",
-                JSONObject.quote("Allow BenchPR to install apps, then return to the app to finish the update."),
+                JSONObject.quote("Allow PR TRACKER to install apps, then return to the app to finish the update."),
             )
             return
         }

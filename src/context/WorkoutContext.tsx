@@ -12,9 +12,11 @@ import {
   deleteWorkoutById,
   findLastLift,
   insertWorkout,
+  loadCustomAccessories,
   loadPreferences,
   loadWorkouts,
   resolveLanguage,
+  saveCustomAccessories,
   savePreferences,
   saveWorkoutsList,
   StoredPreferences,
@@ -51,6 +53,7 @@ interface WorkoutContextValue {
   muscleRanks: Record<MuscleGroup, MuscleRankInfo>;
   overallRank: OverallRank;
   activeWorkout: ActiveWorkoutState | null;
+  customAccessories: string[];
   timerSecondsRemaining: number;
   timerTotalSeconds: number;
   isTimerRunning: boolean;
@@ -70,7 +73,10 @@ interface WorkoutContextValue {
   toggleSetCompletion: (exerciseIndex: number, setIndex: number) => void;
   updateSetWeight: (exerciseIndex: number, setIndex: number, weight: number) => void;
   updateSetReps: (exerciseIndex: number, setIndex: number, reps: number) => void;
+  updateSetRpe: (exerciseIndex: number, setIndex: number, rpe: number | undefined) => void;
   toggleSetAccessory: (exerciseIndex: number, setIndex: number, accessory: LiftingAccessory) => void;
+  applyExerciseAccessories: (exerciseIndex: number, accessories: LiftingAccessory[]) => void;
+  addCustomAccessory: (name: string) => void;
   startTimer: (durationSeconds: number) => void;
   stopTimer: () => void;
   finishWorkout: (onSaved: () => void) => void;
@@ -103,7 +109,15 @@ function sanitizeWorkoutForCloud(w: WorkoutWithSets, userId: string) {
       actualWeight: Number(s.actualWeight || 0),
       actualReps: Number(s.actualReps || 0),
       isCompleted: Boolean(s.isCompleted),
-      accessories: Array.isArray(s.accessories) ? s.accessories : [],
+      ...(typeof s.rpe === 'number' && Number.isFinite(s.rpe) && s.rpe >= 1 && s.rpe <= 10
+        ? { rpe: Math.round(s.rpe * 2) / 2 }
+        : {}),
+      accessories: Array.isArray(s.accessories)
+        ? s.accessories
+            .slice(0, 16)
+            .map((a) => String(a).trim().slice(0, 40))
+            .filter(Boolean)
+        : [],
     })),
   };
 }
@@ -154,6 +168,7 @@ function buildActiveExercise(template: ExerciseTemplate, targetWeight: number): 
 export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [prefs, setPrefs] = useState<StoredPreferences>(() => loadPreferences());
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutWithSets[]>(() => loadWorkouts());
+  const [customAccessories, setCustomAccessories] = useState<string[]>(() => loadCustomAccessories());
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkoutState | null>(null);
   const [timerSecondsRemaining, setTimerSecondsRemaining] = useState(0);
   const [timerTotalSeconds, setTimerTotalSeconds] = useState(0);
@@ -526,6 +541,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             actualReps: last?.actualReps ?? ex.template.targetReps,
             isCompleted: false,
             durationSeconds: last?.durationSeconds ?? ex.template.targetDurationSeconds,
+            accessories: last?.accessories ? [...last.accessories] : undefined,
           };
           return { ...ex, sets: [...ex.sets, newSet] };
         }),
@@ -607,6 +623,32 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const updateSetRpe = useCallback(
+    (exerciseIndex: number, setIndex: number, rpe: number | undefined) => {
+      const normalized =
+        typeof rpe === 'number' && Number.isFinite(rpe) && rpe >= 1 && rpe <= 10
+          ? Math.round(rpe * 2) / 2
+          : undefined;
+      setActiveWorkout((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          exercises: current.exercises.map((ex, idx) =>
+            idx !== exerciseIndex
+              ? ex
+              : {
+                  ...ex,
+                  sets: ex.sets.map((set, sIdx) =>
+                    sIdx !== setIndex ? set : { ...set, rpe: normalized },
+                  ),
+                },
+          ),
+        };
+      });
+    },
+    [],
+  );
+
   const toggleSetAccessory = useCallback((exerciseIndex: number, setIndex: number, accessory: LiftingAccessory) => {
     setActiveWorkout((current) => {
       if (!current) return current;
@@ -632,6 +674,39 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const applyExerciseAccessories = useCallback((exerciseIndex: number, accessories: LiftingAccessory[]) => {
+    const clean = Array.from(new Set(accessories.map((a) => a.trim()).filter(Boolean))).slice(0, 16);
+    setActiveWorkout((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        exercises: current.exercises.map((ex, idx) =>
+          idx !== exerciseIndex
+            ? ex
+            : {
+                ...ex,
+                sets: ex.sets.map((set) => ({
+                  ...set,
+                  accessories: [...clean],
+                })),
+              },
+        ),
+      };
+    });
+  }, []);
+
+  const addCustomAccessory = useCallback((name: string) => {
+    const clean = name.trim().slice(0, 40);
+    if (!clean) return;
+    setCustomAccessories((prev) => {
+      const exists = prev.some((item) => item.toLowerCase() === clean.toLowerCase());
+      if (exists) return prev;
+      const next = [...prev, clean];
+      saveCustomAccessories(next);
+      return next;
+    });
+  }, []);
+
   const finishWorkout = useCallback(
     (onSaved: () => void) => {
       if (!activeWorkout) return;
@@ -654,6 +729,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           actualWeight: set.actualWeight,
           actualReps: set.actualReps,
           isCompleted: set.isCompleted,
+          ...(typeof set.rpe === 'number' && Number.isFinite(set.rpe) ? { rpe: set.rpe } : {}),
           accessories: set.accessories ?? [],
         })),
       );
@@ -742,6 +818,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     muscleRanks,
     overallRank,
     activeWorkout,
+    customAccessories,
     timerSecondsRemaining,
     timerTotalSeconds,
     isTimerRunning,
@@ -760,7 +837,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toggleSetCompletion,
     updateSetWeight,
     updateSetReps,
+    updateSetRpe,
     toggleSetAccessory,
+    applyExerciseAccessories,
+    addCustomAccessory,
     startTimer,
     stopTimer,
     finishWorkout,
