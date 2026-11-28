@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, Columns3, Dumbbell, List, Settings, Trophy, UserRound } from 'lucide-react';
+import { Award, Columns3, Dumbbell, List, Trophy, UserRound } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { AppRoute } from '../types/models';
 import { AppLogo } from './AppLogo';

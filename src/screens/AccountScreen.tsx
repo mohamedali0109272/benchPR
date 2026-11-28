@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, Globe, LogOut, UserRound, Settings, Languages, Sliders, Scale } from 'lucide-react';
+import { Check, Copy, Globe, LogOut, UserRound, Languages, Sliders } from 'lucide-react';
 import { GoogleGlyph } from '../components/GoogleGlyph';
 import { AppUpdateCard } from '../components/AppUpdateCard';
 import { auth, isAndroidApp, logoutUser, onAuthStateChanged, openAndroidBrowserAuth, signInWithGoogle, User } from '../services/firebase';
