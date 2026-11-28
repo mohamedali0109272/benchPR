@@ -432,4 +432,6 @@ export const uiStrings: Record<string, string> = {
   'Reset to bar only': 'إعادة ضبط للبار فقط',
   'Click to disable plate': 'اضغط لتعطيل الطارة',
   'Click to enable plate': 'اضغط لتفعيل الطارة',
+  "Package signing key differs from the installed build. Uninstall PR TRACKER once, then install the new APK from GitHub Releases.":
+    'مفتاح توقيع التحديث يختلف عن النسخة المثبتة حالياً. احذف تطبيق PR TRACKER مرة واحدة ثم ثبّت التحديث الجديد من صفحة الإصدارات على GitHub.',
 };

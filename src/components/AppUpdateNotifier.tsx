@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowDownToLine, Sparkles, X } from 'lucide-react';
+import { ArrowDownToLine, ExternalLink, Sparkles, X } from 'lucide-react';
 import { checkLatestRelease, GitHubReleaseInfo, triggerAppUpdate, getActiveVersion } from '../services/appUpdater';
 import { useI18n } from '../i18n/I18nContext';
 
@@ -132,7 +132,18 @@ export const AppUpdateNotifier: React.FC = () => {
               </span>
             </button>
             {installError && (
-              <p className="text-xs font-medium text-[#FF2D55] text-center">{installError}</p>
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-medium text-[#FF2D55] text-center">{t(installError)}</p>
+                <a
+                  href={releaseInfo.htmlUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#1E2532] border border-white/10 text-xs font-bold text-[#00E5FF] hover:bg-[#252F40] transition-colors"
+                >
+                  <span>{t('View Release on GitHub')}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             )}
           </div>
         ) : (

@@ -6,10 +6,14 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import java.io.File
+import java.security.MessageDigest
 import java.net.HttpURLConnection
 import java.net.URL
 import android.util.Log
@@ -299,6 +303,62 @@ class MainActivity : Activity() {
         if (!partial.renameTo(target)) throw IOException("Could not save the update file")
     }
 
+    private fun getSigningCertSha256s(info: PackageInfo?): Set<String> {
+        if (info == null) return emptySet()
+        val rawSignatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val signingInfo = info.signingInfo ?: return emptySet()
+            if (signingInfo.hasMultipleSigners()) {
+                signingInfo.apkContentsSigners
+            } else {
+                signingInfo.signingCertificateHistory
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            info.signatures
+        } ?: return emptySet()
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        return rawSignatures.map { sig ->
+            digest.digest(sig.toByteArray()).joinToString("") { "%02x".format(it) }
+        }.toSet()
+    }
+
+    private fun hasCompatibleSignature(apk: File): Boolean {
+        return try {
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                @Suppress("DEPRECATION")
+                PackageManager.GET_SIGNATURES
+            }
+            val installedInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(flags.toLong()),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, flags)
+            }
+            val archiveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageArchiveInfo(
+                    apk.absolutePath,
+                    PackageManager.PackageInfoFlags.of(flags.toLong()),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
+            }
+            val installedCerts = getSigningCertSha256s(installedInfo)
+            val archiveCerts = getSigningCertSha256s(archiveInfo)
+            if (installedCerts.isEmpty() || archiveCerts.isEmpty()) return true
+            installedCerts.intersect(archiveCerts).isNotEmpty()
+        } catch (e: Exception) {
+            Log.w(TAG, "Signature compatibility check skipped", e)
+            true
+        }
+    }
+
     private fun installDownloadedApk() {
         val apk = pendingUpdateApk ?: return
         if (!packageManager.canRequestPackageInstalls()) {
@@ -315,6 +375,16 @@ class MainActivity : Activity() {
             return
         }
         pendingUpdateApk = null
+        if (!hasCompatibleSignature(apk)) {
+            apk.delete()
+            reportUpdateToJs(
+                "__onUpdateError",
+                JSONObject.quote(
+                    "Package signing key differs from the installed build. Uninstall PR TRACKER once, then install the new APK from GitHub Releases.",
+                ),
+            )
+            return
+        }
         reportUpdateToJs("__onUpdateProgress", "100")
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
         val installIntent = Intent(Intent.ACTION_VIEW).apply {

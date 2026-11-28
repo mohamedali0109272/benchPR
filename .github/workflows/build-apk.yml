@@ -45,6 +45,12 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Restore fallback signing keystore cache
+        uses: actions/cache@v4
+        with:
+          path: app/debug.keystore
+          key: benchpr-fallback-debug-keystore-v1
+
       - name: Decode signing keystore
         id: keystore
         env:
@@ -64,15 +70,16 @@ jobs:
                 echo "key_alias=$ALIAS" >> "$GITHUB_OUTPUT"
                 echo "key_password=${KEY_PASSWORD:-$STORE_PW}" >> "$GITHUB_OUTPUT"
                 USE_CI_KEYSTORE=1
+                rm -f app/debug.keystore
                 echo "Verified CI signing keystore with alias '$ALIAS'."
               else
-                echo "::warning::KEYSTORE_BASE64 is missing matching KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD secrets; falling back to repository debug.keystore."
+                echo "::warning::KEYSTORE_BASE64 is missing matching KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD secrets; falling back to repository/cached debug.keystore."
               fi
             else
-              echo "::warning::Failed to decode KEYSTORE_BASE64; falling back to repository debug.keystore."
+              echo "::warning::Failed to decode KEYSTORE_BASE64; falling back to repository/cached debug.keystore."
             fi
           else
-            echo "No KEYSTORE_BASE64 secret set; using fallback debug keystore."
+            echo "::warning::KEYSTORE_BASE64 secret is not set. Using cached fallback keystore; add KEYSTORE_BASE64 in repository Secrets for permanent update compatibility."
           fi
 
           if [ "$USE_CI_KEYSTORE" -eq 0 ]; then
@@ -82,7 +89,11 @@ jobs:
             echo "key_password=" >> "$GITHUB_OUTPUT"
             if [ -f debug.keystore.base64 ]; then
               tr -d '[:space:]' < debug.keystore.base64 | base64 -d > app/debug.keystore
+              echo "Using repository debug.keystore.base64."
+            elif [ -f app/debug.keystore ]; then
+              echo "Reusing cached app/debug.keystore."
             else
+              echo "Generating new fallback app/debug.keystore (will be cached for future builds)."
               keytool -genkey -v -keystore app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, O=Android, C=US" >/dev/null 2>&1
             fi
           fi

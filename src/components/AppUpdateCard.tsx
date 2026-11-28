@@ -161,7 +161,18 @@ export const AppUpdateCard: React.FC<AppUpdateCardProps> = ({ compact = false })
               </span>
             </button>
             {installError && (
-              <p className="text-[11px] font-medium text-[#FF2D55]">{installError}</p>
+              <div className="space-y-2 pt-1">
+                <p className="text-[11px] font-medium text-[#FF2D55]">{t(installError)}</p>
+                <a
+                  href={releaseInfo.htmlUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-[#1E2532] border border-white/10 text-xs font-bold text-[#00E5FF] hover:bg-[#252F40] transition-colors"
+                >
+                  <span>{t('View Release on GitHub')}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             )}
             </>
           ) : (
