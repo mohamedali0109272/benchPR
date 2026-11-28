@@ -21,6 +21,7 @@ import {
   saveWorkoutsList,
   StoredPreferences,
 } from '../data/storage';
+import { TargetLiftKind } from '../components/Edit1RMModal';
 import {
   ActiveExerciseState,
   ActiveWorkoutState,
@@ -72,6 +73,7 @@ interface WorkoutContextValue {
   updateBodyweightKg: (kg: number) => void;
   startSplitDay: (splitId: string, dayIndex: number) => void;
   startQuickWorkout: (exerciseId?: string | null) => void;
+  startLiftGoalWorkout: (liftKind: TargetLiftKind) => void;
   addExercise: (item: ExerciseItem) => void;
   removeExercise: (exerciseIndex: number) => void;
   addSet: (exerciseIndex: number) => void;
@@ -689,6 +691,76 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [beginWorkout, prefs.target1RM],
   );
 
+  const startLiftGoalWorkout = useCallback(
+    (liftKind: TargetLiftKind) => {
+      stopTimer();
+      let exerciseId = 'ex_bench';
+      let exerciseName = 'Bench Press';
+      let targetGoal = prefs.target1RM;
+      if (liftKind === 'squat') {
+        exerciseId = 'ex_squat';
+        exerciseName = 'Barbell Squat';
+        targetGoal = prefs.targetSquat1RM;
+      } else if (liftKind === 'deadlift') {
+        exerciseId = 'ex_deadlift';
+        exerciseName = 'Deadlift';
+        targetGoal = prefs.targetDeadlift1RM;
+      }
+
+      const item = ExerciseLibrary.getById(exerciseId);
+      const tpl: ExerciseTemplate = {
+        id: `${exerciseId}_goal_${Date.now()}`,
+        name: item?.name ?? exerciseName,
+        targetPercent: 0.0,
+        targetReps: 5,
+        targetDurationSeconds: 0,
+        totalSets: 6,
+        isStaticHold: false,
+      };
+
+      const roundToPlate = (w: number) => Math.round(w * 2) / 2;
+      const w1 = roundToPlate(targetGoal * 0.50);
+      const w2 = roundToPlate(targetGoal * 0.70);
+      const w3 = roundToPlate(targetGoal * 0.80);
+      const t1 = roundToPlate(targetGoal * 0.875);
+      const t2 = roundToPlate(targetGoal * 0.925);
+      const b1 = roundToPlate(targetGoal * 0.75);
+
+      const sets: ExerciseSetState[] = [
+        { setIndex: 1, targetWeight: w1, targetReps: 8, actualWeight: w1, actualReps: 8, isCompleted: false, durationSeconds: 0 },
+        { setIndex: 2, targetWeight: w2, targetReps: 5, actualWeight: w2, actualReps: 5, isCompleted: false, durationSeconds: 0 },
+        { setIndex: 3, targetWeight: w3, targetReps: 3, actualWeight: w3, actualReps: 3, isCompleted: false, durationSeconds: 0 },
+        { setIndex: 4, targetWeight: t1, targetReps: 3, actualWeight: t1, actualReps: 3, isCompleted: false, durationSeconds: 0 },
+        { setIndex: 5, targetWeight: t2, targetReps: 1, actualWeight: t2, actualReps: 1, isCompleted: false, durationSeconds: 0 },
+        { setIndex: 6, targetWeight: b1, targetReps: 8, actualWeight: b1, actualReps: 8, isCompleted: false, durationSeconds: 0 },
+      ];
+
+      const activeEx: ActiveExerciseState = {
+        template: tpl,
+        calculatedTargetWeight: t1,
+        sets,
+      };
+
+      const session: WorkoutSessionTemplate = {
+        id: 0,
+        title: `${exerciseName} Peak Goal Session`,
+        subtitle: `Target 1RM: ${targetGoal} ${prefs.weightUnit}`,
+        goal: `Build to peak goal of ${targetGoal} ${prefs.weightUnit}`,
+        exercises: [tpl],
+      };
+
+      setActiveWorkout({
+        sessionTemplate: session,
+        target1RM: targetGoal,
+        unit: prefs.weightUnit,
+        exercises: [activeEx],
+        startTimeMillis: Date.now(),
+        isFinished: false,
+      });
+    },
+    [prefs.target1RM, prefs.targetSquat1RM, prefs.targetDeadlift1RM, prefs.weightUnit, stopTimer],
+  );
+
   const addExercise = useCallback(
     (item: ExerciseItem) => {
       const holdSeconds = item.isTimed ? (item.id === 'ex_static_hold' ? 30 : 45) : 0;
@@ -1032,6 +1104,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateBodyweightKg,
     startSplitDay,
     startQuickWorkout,
+    startLiftGoalWorkout,
     addExercise,
     removeExercise,
     addSet,

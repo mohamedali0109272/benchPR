@@ -91,15 +91,20 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               })}
             </nav>
 
-            {/* Zone 3: Settings (opens side menu with account + language) */}
+            {/* Zone 3: Account */}
             <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => setMenuOpen(true)}
-                aria-label={t('Settings')}
-                className="p-2 rounded-lg bg-[#161B24] border border-white/10 text-[#8B949E] hover:text-[#F0F6FC] hover:border-[#FF2D55]/50 transition-all cursor-pointer"
+                onClick={() => onNavigate('account')}
+                aria-label={t('Account')}
+                className={`p-2 sm:px-3 sm:py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
+                  currentRoute === 'account'
+                    ? 'bg-[#FF2D55]/20 border-[#FF2D55]/60 text-[#FF6B8B] shadow-[0_0_12px_rgba(255,45,85,0.2)]'
+                    : 'bg-[#161B24] border-white/10 text-[#8B949E] hover:text-[#F0F6FC] hover:border-[#FF2D55]/40'
+                }`}
               >
-                <Settings className="w-4 h-4" />
+                <UserRound className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-bold hidden sm:inline">{t('Account')}</span>
               </button>
             </div>
           </div>

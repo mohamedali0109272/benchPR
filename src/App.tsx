@@ -21,6 +21,7 @@ const BenchPRAppContent: React.FC = () => {
     setLanguage,
     startSplitDay,
     startQuickWorkout,
+    startLiftGoalWorkout,
   } = useWorkout();
 
   const [route, setRoute] = useState<AppRoute>('home');
@@ -56,6 +57,10 @@ const BenchPRAppContent: React.FC = () => {
             }}
             onOpenSplits={() => navigate('splits')}
             onNavigateToHistory={() => navigate('history')}
+            onStartLiftGoal={(kind) => {
+              startLiftGoalWorkout(kind);
+              openSession();
+            }}
           />
         )}
 
