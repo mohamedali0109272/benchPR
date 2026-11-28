@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LanguageModal } from './components/LanguageModal';
 import { NavigationShell } from './components/NavigationShell';
+import { AppUpdateNotifier } from './components/AppUpdateNotifier';
 import { useWorkout, WorkoutProvider } from './context/WorkoutContext';
 import { I18nProvider } from './i18n/I18nContext';
 import { ExercisesScreen } from './screens/ExercisesScreen';
@@ -41,6 +42,7 @@ const BenchPRAppContent: React.FC = () => {
 
   return (
     <I18nProvider language={language}>
+      <AppUpdateNotifier />
       <NavigationShell
         currentRoute={route}
         onNavigate={navigate}
