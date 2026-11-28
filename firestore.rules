@@ -131,6 +131,24 @@ service cloud.firestore {
         (!data.keys().hasAny(['bestDeadlift']) || (data.bestDeadlift is number && data.bestDeadlift >= 0));
     }
 
+    function isValidActivity(data) {
+      return data.keys().hasAll(['id', 'uid', 'message', 'timestamp']) &&
+        data.keys().hasOnly([
+          'id',
+          'uid',
+          'displayName',
+          'photoURL',
+          'message',
+          'timestamp'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.uid) &&
+        data.message is string && data.message.size() > 0 && data.message.size() <= 300 &&
+        data.timestamp is number && data.timestamp > 0 &&
+        (!data.keys().hasAny(['displayName']) || (data.displayName is string && data.displayName.size() <= 128)) &&
+        (!data.keys().hasAny(['photoURL']) || (data.photoURL is string && data.photoURL.size() <= 512));
+    }
+
     match /users/{userId} {
       allow get: if isValidId(userId) && isOwner(userId);
       allow list: if false;
@@ -198,6 +216,17 @@ service cloud.firestore {
         isValidPublicProfile(incoming()) &&
         incoming().uid == userId;
       allow delete: if isValidId(userId) && isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /activities/{activityId} {
+      allow get, list: if isSignedIn();
+      allow create: if isValidId(activityId) &&
+        isSignedIn() &&
+        isValidActivity(incoming()) &&
+        incoming().id == activityId &&
+        incoming().uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if isValidId(activityId) && isSignedIn() && existing().uid == request.auth.uid;
     }
   }
 }

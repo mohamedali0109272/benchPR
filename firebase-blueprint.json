@@ -60,6 +60,20 @@
         "updatedAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["uid", "updatedAt"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Community workout and PR activity feed item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "message": { "type": "string", "maxLength": 300 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "uid", "message", "timestamp"]
     }
   },
   "firestore": {
@@ -78,6 +92,10 @@
     "/publicProfiles/{userId}": {
       "schema": { "$ref": "PublicProfile" },
       "description": "Public community PR leaderboard profiles"
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "Activity" },
+      "description": "Community workout and PR activity feed"
     }
   }
 }

@@ -187,8 +187,56 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const language = useMemo(() => resolveLanguage(prefs.languageCode), [prefs.languageCode]);
 
-  const [communityProfiles, setCommunityProfiles] = useState<PublicProfileEntity[]>([]);
-  const [activities, setActivities] = useState<ActivityEntity[]>([]);
+  const DEMO_ACTIVITIES: ActivityEntity[] = useMemo(
+    () => [
+      {
+        id: 'act_1',
+        uid: 'demo_1',
+        displayName: 'Alex Thor',
+        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        message: 'hit a new Bench Press PR: 140 kg with Belt & Wrist Wraps',
+        timestamp: Date.now() - 1000 * 60 * 45,
+      },
+      {
+        id: 'act_2',
+        uid: 'demo_2',
+        displayName: 'Sarah Lift',
+        photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        message: 'completed Heavy Squat Session with 150 kg (RPE 9)',
+        timestamp: Date.now() - 1000 * 60 * 180,
+      },
+    ],
+    [],
+  );
+
+  const DEMO_COMMUNITY_PROFILES: PublicProfileEntity[] = useMemo(
+    () => [
+      {
+        uid: 'demo_1',
+        displayName: 'Alex Thor',
+        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        bestBench: 140,
+        bestSquat: 200,
+        bestDeadlift: 240,
+        bodyweightKg: 82,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        uid: 'demo_2',
+        displayName: 'Sarah Lift',
+        photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        bestBench: 95,
+        bestSquat: 150,
+        bestDeadlift: 180,
+        bodyweightKg: 65,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    [],
+  );
+
+  const [communityProfiles, setCommunityProfiles] = useState<PublicProfileEntity[]>(() => DEMO_COMMUNITY_PROFILES);
+  const [activities, setActivities] = useState<ActivityEntity[]>(() => DEMO_ACTIVITIES);
   const [followingUids, setFollowingUids] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('benchpr_following_v1');
@@ -205,95 +253,79 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         : [...prev, targetUid];
       try {
         localStorage.setItem('benchpr_following_v1', JSON.stringify(next));
-      } catch {}
+      } catch {
+        // Ignore storage quota issues
+      }
       return next;
     });
   }, []);
 
   const publishActivity = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, message: string) => {
+    const cleanMessage = message.trim().slice(0, 300);
+    if (!cleanMessage) return;
+
     const act: ActivityEntity = {
-      id: `${user.uid}_${Date.now()}`,
+      id: `${user.uid}_${Date.now()}`.slice(0, 128),
       uid: user.uid,
-      displayName: user.displayName || 'Athlete',
-      photoURL: user.photoURL || undefined,
-      message,
+      displayName: (user.displayName || 'Athlete').slice(0, 128),
+      ...(user.photoURL ? { photoURL: user.photoURL.slice(0, 512) } : {}),
+      message: cleanMessage,
       timestamp: Date.now(),
     };
+    const actPath = `activities/${act.id}`;
     try {
       await setDoc(doc(db, 'activities', act.id), act);
       setActivities((prev) => [act, ...prev]);
     } catch (err) {
-      console.error('Failed to publish activity:', err);
+      try {
+        handleFirestoreError(err, OperationType.CREATE, actPath);
+      } catch (loggedErr) {
+        console.error('Failed to publish activity:', loggedErr);
+      }
     }
   }, []);
 
-  // Fetch activities on mount
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'activities'));
-        const acts: ActivityEntity[] = snap.docs.map((d) => d.data() as ActivityEntity);
-        if (acts.length > 0) {
-          setActivities(acts.sort((a, b) => b.timestamp - a.timestamp));
-        } else {
-          setActivities([
-            {
-              id: 'act_1',
-              uid: 'demo_1',
-              displayName: 'Alex Thor',
-              photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-              message: 'hit a new Bench Press PR: 140 kg with Belt & Wrist Wraps',
-              timestamp: Date.now() - 1000 * 60 * 45,
-            },
-            {
-              id: 'act_2',
-              uid: 'demo_2',
-              displayName: 'Sarah Lift',
-              photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-              message: 'completed Heavy Squat Session with 150 kg (RPE 9)',
-              timestamp: Date.now() - 1000 * 60 * 180,
-            },
-          ]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch activities:', err);
-        setActivities([
-          {
-            id: 'act_1',
-            uid: 'demo_1',
-            displayName: 'Alex Thor',
-            photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-            message: 'hit a new Bench Press PR: 140 kg with Belt & Wrist Wraps',
-            timestamp: Date.now() - 1000 * 60 * 45,
-          },
-          {
-            id: 'act_2',
-            uid: 'demo_2',
-            displayName: 'Sarah Lift',
-            photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-            message: 'completed Heavy Squat Session with 150 kg (RPE 9)',
-            timestamp: Date.now() - 1000 * 60 * 180,
-          },
-        ]);
+  const fetchActivities = useCallback(async () => {
+    try {
+      const snap = await getDocs(collection(db, 'activities'));
+      const acts: ActivityEntity[] = snap.docs.map((d) => d.data() as ActivityEntity);
+      if (acts.length > 0) {
+        setActivities(acts.sort((a, b) => b.timestamp - a.timestamp));
+      } else {
+        setActivities(DEMO_ACTIVITIES);
       }
-    };
-    fetchActivities();
-  }, []);
+    } catch (err) {
+      try {
+        handleFirestoreError(err, OperationType.LIST, 'activities');
+      } catch (loggedErr) {
+        console.error('Failed to fetch activities:', loggedErr);
+      }
+      setActivities(DEMO_ACTIVITIES);
+    }
+  }, [DEMO_ACTIVITIES]);
 
   const publishPublicProfile = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, currentPrefs: StoredPreferences, workouts: WorkoutWithSets[]) => {
     const bestB = computeBestBenchLifted(workouts);
     const bestS = computeBestSquatLifted(workouts);
     const bestD = computeBestDeadliftLifted(workouts);
+    const clampedBw =
+      typeof currentPrefs.bodyweightKg === 'number' &&
+      Number.isFinite(currentPrefs.bodyweightKg) &&
+      currentPrefs.bodyweightKg >= 20 &&
+      currentPrefs.bodyweightKg <= 400
+        ? currentPrefs.bodyweightKg
+        : 75;
     const payload: PublicProfileEntity = {
       uid: user.uid,
-      displayName: user.displayName || 'Athlete',
-      photoURL: user.photoURL || undefined,
-      bestBench: bestB !== null ? RankingEngine.toKg(bestB, currentPrefs.weightUnit) : 0,
-      bestSquat: bestS !== null ? RankingEngine.toKg(bestS, currentPrefs.weightUnit) : 0,
-      bestDeadlift: bestD !== null ? RankingEngine.toKg(bestD, currentPrefs.weightUnit) : 0,
-      bodyweightKg: currentPrefs.bodyweightKg,
+      displayName: (user.displayName || 'Athlete').slice(0, 128),
+      ...(user.photoURL ? { photoURL: user.photoURL.slice(0, 512) } : {}),
+      bestBench: bestB !== null ? Math.max(0, RankingEngine.toKg(bestB, currentPrefs.weightUnit)) : 0,
+      bestSquat: bestS !== null ? Math.max(0, RankingEngine.toKg(bestS, currentPrefs.weightUnit)) : 0,
+      bestDeadlift: bestD !== null ? Math.max(0, RankingEngine.toKg(bestD, currentPrefs.weightUnit)) : 0,
+      bodyweightKg: clampedBw,
       updatedAt: new Date().toISOString(),
     };
+    const profilePath = `publicProfiles/${user.uid}`;
     try {
       await setDoc(doc(db, 'publicProfiles', user.uid), payload);
       setCommunityProfiles((prev) => {
@@ -306,75 +338,41 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return [payload, ...prev];
       });
     } catch (err) {
-      console.error('Failed to publish public profile:', err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, profilePath);
+      } catch (loggedErr) {
+        console.error('Failed to publish public profile:', loggedErr);
+      }
     }
   }, []);
 
-  // Fetch community profiles on mount
-  useEffect(() => {
-    const fetchCommunity = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'publicProfiles'));
-        const profiles: PublicProfileEntity[] = snap.docs.map((d) => d.data() as PublicProfileEntity);
-        if (profiles.length > 0) {
-          setCommunityProfiles(profiles);
-        } else {
-          setCommunityProfiles([
-            {
-              uid: 'demo_1',
-              displayName: 'Alex Thor',
-              photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-              bestBench: 140,
-              bestSquat: 200,
-              bestDeadlift: 240,
-              bodyweightKg: 82,
-              updatedAt: new Date().toISOString(),
-            },
-            {
-              uid: 'demo_2',
-              displayName: 'Sarah Lift',
-              photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-              bestBench: 95,
-              bestSquat: 150,
-              bestDeadlift: 180,
-              bodyweightKg: 65,
-              updatedAt: new Date().toISOString(),
-            },
-          ]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch community profiles:', err);
-        setCommunityProfiles([
-          {
-            uid: 'demo_1',
-            displayName: 'Alex Thor',
-            photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-            bestBench: 140,
-            bestSquat: 200,
-            bestDeadlift: 240,
-            bodyweightKg: 82,
-            updatedAt: new Date().toISOString(),
-          },
-          {
-            uid: 'demo_2',
-            displayName: 'Sarah Lift',
-            photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-            bestBench: 95,
-            bestSquat: 150,
-            bestDeadlift: 180,
-            bodyweightKg: 65,
-            updatedAt: new Date().toISOString(),
-          },
-        ]);
+  const fetchCommunity = useCallback(async () => {
+    try {
+      const snap = await getDocs(collection(db, 'publicProfiles'));
+      const profiles: PublicProfileEntity[] = snap.docs.map((d) => d.data() as PublicProfileEntity);
+      if (profiles.length > 0) {
+        setCommunityProfiles(profiles);
+      } else {
+        setCommunityProfiles(DEMO_COMMUNITY_PROFILES);
       }
-    };
-    fetchCommunity();
-  }, []);
+    } catch (err) {
+      try {
+        handleFirestoreError(err, OperationType.LIST, 'publicProfiles');
+      } catch (loggedErr) {
+        console.error('Failed to fetch community profiles:', loggedErr);
+      }
+      setCommunityProfiles(DEMO_COMMUNITY_PROFILES);
+    }
+  }, [DEMO_COMMUNITY_PROFILES]);
 
   // Sync with Firestore when auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        setActivities(DEMO_ACTIVITIES);
+        setCommunityProfiles(DEMO_COMMUNITY_PROFILES);
+        return;
+      }
       const currentPrefs = prefsRef.current;
 
       // Sync user profile & prefs
@@ -445,14 +443,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
         }
 
-        // Publish public profile
+        // Publish public profile, then load community leaderboard & activities
         await publishPublicProfile(user, prefsRef.current, workoutsToPublish);
+        await Promise.all([fetchCommunity(), fetchActivities()]);
       } catch (err) {
         console.error('Firestore sync error on login:', err);
       }
     });
     return () => unsubscribe();
-  }, [publishPublicProfile]);
+  }, [DEMO_ACTIVITIES, DEMO_COMMUNITY_PROFILES, fetchActivities, fetchCommunity, publishPublicProfile]);
 
   const updatePrefs = useCallback((updater: (prev: StoredPreferences) => StoredPreferences) => {
     setPrefs((prev) => {
@@ -718,7 +717,10 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isStaticHold: false,
       };
 
-      const roundToPlate = (w: number) => Math.round(w * 2) / 2;
+      const barWeight = prefs.weightUnit === 'lbs' ? 45 : 20;
+      const minPairIncrement = 5; // Smallest plate = 2.5 per side (5 total)
+      const roundToPlate = (w: number) =>
+        Math.max(barWeight, barWeight + Math.round((w - barWeight) / minPairIncrement) * minPairIncrement);
       const w1 = roundToPlate(targetGoal * 0.50);
       const w2 = roundToPlate(targetGoal * 0.70);
       const w3 = roundToPlate(targetGoal * 0.80);

@@ -24,7 +24,6 @@ const NAV_ITEMS: NavItem[] = [
   { route: 'muscles', label: 'Muscles', icon: Award },
   { route: 'exercises', label: 'Exercises', icon: List },
   { route: 'community', label: 'Community', icon: Trophy },
-  { route: 'account', label: 'Account', icon: UserRound },
 ];
 
 export const NavigationShell: React.FC<NavigationShellProps> = ({

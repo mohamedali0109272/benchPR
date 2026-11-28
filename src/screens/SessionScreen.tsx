@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft,
+  Calculator,
   Check,
   CheckCircle2,
   Minus,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
+import { PlateCalculatorModal } from '../components/PlateCalculatorModal';
 import { useWorkout } from '../context/WorkoutContext';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
 import { formatPlainWeight } from '../data/RankingEngine';
@@ -60,6 +62,11 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
 
   const [showPicker, setShowPicker] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [plateCalcTarget, setPlateCalcTarget] = useState<{
+    weight: number;
+    exerciseIndex?: number;
+    setIndex?: number;
+  } | null>(null);
 
   if (!activeWorkout) {
     return (
@@ -109,14 +116,33 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => finishWorkout(onWorkoutFinished)}
-            aria-label="Finish Workout"
-            className="w-10 h-10 rounded-xl bg-[#00E676]/15 border border-[#00E676]/40 flex items-center justify-center text-[#00E676] hover:bg-[#00E676]/25 active:scale-95 transition-all shrink-0 cursor-pointer"
-          >
-            <CheckCircle2 className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const nextSet = activeWorkout.exercises
+                  .flatMap((ex) => (ex.template.isStaticHold ? [] : ex.sets))
+                  .find((s) => !s.isCompleted && s.actualWeight > 0)
+                  ?? activeWorkout.exercises.flatMap((ex) => ex.sets).find((s) => s.actualWeight > 0);
+                setPlateCalcTarget({ weight: nextSet?.actualWeight ?? 0 });
+              }}
+              aria-label={t('Plate Calculator')}
+              className="h-10 px-3 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 flex items-center justify-center gap-1.5 text-[#00E5FF] hover:bg-[#00E5FF]/25 active:scale-95 transition-all shrink-0 cursor-pointer"
+              title={t('Plate Calculator')}
+            >
+              <Calculator className="w-4 h-4" />
+              <span className="text-xs font-bold hidden sm:inline">{t('Plates')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => finishWorkout(onWorkoutFinished)}
+              aria-label="Finish Workout"
+              className="w-10 h-10 rounded-xl bg-[#00E676]/15 border border-[#00E676]/40 flex items-center justify-center text-[#00E676] hover:bg-[#00E676]/25 active:scale-95 transition-all shrink-0 cursor-pointer"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -175,6 +201,9 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
               onAddSet={() => addSet(eIdx)}
               onRemoveSet={() => removeSet(eIdx, exerciseState.sets.length - 1)}
               onRemoveExercise={() => removeExercise(eIdx)}
+              onOpenPlateCalc={(sIdx, weight) =>
+                setPlateCalcTarget({ weight, exerciseIndex: eIdx, setIndex: sIdx })
+              }
             />
           ))}
         </div>
@@ -209,6 +238,20 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
           title="Add exercise"
           onPick={(item) => addExercise(item)}
           onClose={() => setShowPicker(false)}
+        />
+      )}
+
+      {plateCalcTarget && (
+        <PlateCalculatorModal
+          initialWeight={plateCalcTarget.weight}
+          unit={activeWorkout.unit}
+          onClose={() => setPlateCalcTarget(null)}
+          onSelectWeight={
+            plateCalcTarget.exerciseIndex !== undefined && plateCalcTarget.setIndex !== undefined
+              ? (weight) =>
+                  updateSetWeight(plateCalcTarget.exerciseIndex!, plateCalcTarget.setIndex!, weight)
+              : undefined
+          }
         />
       )}
 
@@ -320,6 +363,7 @@ interface ExerciseLoggingCardProps {
   onAddSet: () => void;
   onRemoveSet: () => void;
   onRemoveExercise: () => void;
+  onOpenPlateCalc: (setIndex: number, weight: number) => void;
 }
 
 const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
@@ -337,6 +381,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
   onAddSet,
   onRemoveSet,
   onRemoveExercise,
+  onOpenPlateCalc,
 }) => {
   const { t } = useI18n();
   const { template, calculatedTargetWeight, sets } = exerciseState;
@@ -415,6 +460,7 @@ const ExerciseLoggingCard: React.FC<ExerciseLoggingCardProps> = ({
             onToggleAccessory={(acc) => onToggleAccessory(setIndex, acc)}
             onApplyToAll={(accs) => onApplyAccessoriesToAll(accs)}
             onAddCustomAccessory={onAddCustomAccessory}
+            onOpenPlateCalc={() => onOpenPlateCalc(setIndex, set.actualWeight)}
           />
         ))}
       </div>
@@ -490,6 +536,7 @@ interface SetLoggingRowProps {
   onToggleAccessory: (accessory: LiftingAccessory) => void;
   onApplyToAll: (accessories: LiftingAccessory[]) => void;
   onAddCustomAccessory: (name: string) => void;
+  onOpenPlateCalc: () => void;
 }
 
 const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
@@ -506,6 +553,7 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
   onToggleAccessory,
   onApplyToAll,
   onAddCustomAccessory,
+  onOpenPlateCalc,
 }) => {
   const { t } = useI18n();
   const [weightText, setWeightText] = useState(formatPlainWeight(set.actualWeight));
@@ -589,6 +637,17 @@ const SetLoggingRow: React.FC<SetLoggingRowProps> = ({
           className="flex items-center gap-2 ms-auto sm:ms-0 sm:order-3"
           onClick={(e) => e.stopPropagation()}
         >
+          {!isStaticHold && (
+            <button
+              type="button"
+              onClick={onOpenPlateCalc}
+              aria-label={`${t('Plate Calculator')} ${t(`SET ${setNumber}`)}`}
+              title={t('Plate Calculator')}
+              className="w-7 h-8 rounded-lg bg-[#161B24] border border-white/10 flex items-center justify-center text-[#00E5FF] hover:bg-[#00E5FF]/15 hover:border-[#00E5FF]/40 transition-colors cursor-pointer shrink-0"
+            >
+              <Calculator className="w-3.5 h-3.5" />
+            </button>
+          )}
           <div className="relative flex items-center">
             <input
               type="number"
