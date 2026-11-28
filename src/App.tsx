@@ -5,6 +5,7 @@ import { useWorkout, WorkoutProvider } from './context/WorkoutContext';
 import { I18nProvider } from './i18n/I18nContext';
 import { ExercisesScreen } from './screens/ExercisesScreen';
 import { AccountScreen } from './screens/AccountScreen';
+import { CommunityScreen } from './screens/CommunityScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { MusclesScreen } from './screens/MusclesScreen';
@@ -95,6 +96,8 @@ const BenchPRAppContent: React.FC = () => {
         )}
 
         {route === 'history' && <HistoryScreen onBackClick={() => navigate('home')} />}
+
+        {route === 'community' && <CommunityScreen />}
 
         {route === 'account' && <AccountScreen />}
       </NavigationShell>

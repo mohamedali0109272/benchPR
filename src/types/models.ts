@@ -240,4 +240,15 @@ export interface AppLanguage {
   isRtl: boolean;
 }
 
-export type AppRoute = 'home' | 'splits' | 'split-detail' | 'muscles' | 'exercises' | 'session' | 'history' | 'account';
+export interface PublicProfileEntity {
+  uid: string;
+  displayName?: string;
+  photoURL?: string;
+  bodyweightKg?: number;
+  bestBench?: number;
+  bestSquat?: number;
+  bestDeadlift?: number;
+  updatedAt: string;
+}
+
+export type AppRoute = 'home' | 'splits' | 'split-detail' | 'muscles' | 'exercises' | 'session' | 'history' | 'community' | 'account';

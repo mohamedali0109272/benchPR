@@ -36,6 +36,7 @@ import {
   WorkoutSessionTemplate,
   WorkoutWithSets,
   LiftingAccessory,
+  PublicProfileEntity,
 } from '../types/models';
 
 interface WorkoutContextValue {
@@ -53,6 +54,7 @@ interface WorkoutContextValue {
   muscleRanks: Record<MuscleGroup, MuscleRankInfo>;
   overallRank: OverallRank;
   activeWorkout: ActiveWorkoutState | null;
+  communityProfiles: PublicProfileEntity[];
   customAccessories: string[];
   timerSecondsRemaining: number;
   timerTotalSeconds: number;
@@ -179,6 +181,99 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const language = useMemo(() => resolveLanguage(prefs.languageCode), [prefs.languageCode]);
 
+  const [communityProfiles, setCommunityProfiles] = useState<PublicProfileEntity[]>([]);
+
+  const publishPublicProfile = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, currentPrefs: StoredPreferences, workouts: WorkoutWithSets[]) => {
+    const bestB = computeBestBenchLifted(workouts);
+    const bestS = computeBestSquatLifted(workouts);
+    const bestD = computeBestDeadliftLifted(workouts);
+    const payload: PublicProfileEntity = {
+      uid: user.uid,
+      displayName: user.displayName || 'Athlete',
+      photoURL: user.photoURL || undefined,
+      bestBench: bestB !== null ? RankingEngine.toKg(bestB, currentPrefs.weightUnit) : 0,
+      bestSquat: bestS !== null ? RankingEngine.toKg(bestS, currentPrefs.weightUnit) : 0,
+      bestDeadlift: bestD !== null ? RankingEngine.toKg(bestD, currentPrefs.weightUnit) : 0,
+      bodyweightKg: currentPrefs.bodyweightKg,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await setDoc(doc(db, 'publicProfiles', user.uid), payload);
+      setCommunityProfiles((prev) => {
+        const index = prev.findIndex((p) => p.uid === user.uid);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = payload;
+          return updated;
+        }
+        return [payload, ...prev];
+      });
+    } catch (err) {
+      console.error('Failed to publish public profile:', err);
+    }
+  }, []);
+
+  // Fetch community profiles on mount
+  useEffect(() => {
+    const fetchCommunity = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'publicProfiles'));
+        const profiles: PublicProfileEntity[] = snap.docs.map((d) => d.data() as PublicProfileEntity);
+        if (profiles.length > 0) {
+          setCommunityProfiles(profiles);
+        } else {
+          setCommunityProfiles([
+            {
+              uid: 'demo_1',
+              displayName: 'Alex Thor',
+              photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+              bestBench: 140,
+              bestSquat: 200,
+              bestDeadlift: 240,
+              bodyweightKg: 82,
+              updatedAt: new Date().toISOString(),
+            },
+            {
+              uid: 'demo_2',
+              displayName: 'Sarah Lift',
+              photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+              bestBench: 95,
+              bestSquat: 150,
+              bestDeadlift: 180,
+              bodyweightKg: 65,
+              updatedAt: new Date().toISOString(),
+            },
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch community profiles:', err);
+        setCommunityProfiles([
+          {
+            uid: 'demo_1',
+            displayName: 'Alex Thor',
+            photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            bestBench: 140,
+            bestSquat: 200,
+            bestDeadlift: 240,
+            bodyweightKg: 82,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            uid: 'demo_2',
+            displayName: 'Sarah Lift',
+            photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+            bestBench: 95,
+            bestSquat: 150,
+            bestDeadlift: 180,
+            bodyweightKg: 65,
+            updatedAt: new Date().toISOString(),
+          },
+        ]);
+      }
+    };
+    fetchCommunity();
+  }, []);
+
   // Sync with Firestore when auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -196,6 +291,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           handleFirestoreError(err, OperationType.GET, userPath);
         }
 
+        let workoutsToPublish: WorkoutWithSets[] = [];
         if (userSnap.exists()) {
           const data = userSnap.data();
           const cloudPrefs: StoredPreferences = {
@@ -237,9 +333,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const sorted = cloudWorkouts.sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
           setHistoryWorkouts(sorted);
           saveWorkoutsList(sorted);
+          workoutsToPublish = sorted;
         } else {
           // Upload local workouts to cloud
           const local = loadWorkouts();
+          workoutsToPublish = local;
           for (const w of local) {
             const workoutId = String(w.workoutLog.id);
             try {
@@ -249,12 +347,15 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           }
         }
+
+        // Publish public profile
+        await publishPublicProfile(user, prefsRef.current, workoutsToPublish);
       } catch (err) {
         console.error('Firestore sync error on login:', err);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [publishPublicProfile]);
 
   const updatePrefs = useCallback((updater: (prev: StoredPreferences) => StoredPreferences) => {
     setPrefs((prev) => {
@@ -758,12 +859,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setDoc(doc(db, 'workouts', workoutId), sanitizeWorkoutForCloud(latest, user.uid)).catch((err) => {
           console.error('Failed to save workout to Firestore:', err);
         });
+        publishPublicProfile(user, prefs, nextWorkouts);
       }
 
       setActiveWorkout(null);
       onSaved();
     },
-    [activeWorkout, historyWorkouts, stopTimer],
+    [activeWorkout, historyWorkouts, prefs, publishPublicProfile, stopTimer],
   );
 
   const cancelWorkout = useCallback(() => {
@@ -818,6 +920,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     muscleRanks,
     overallRank,
     activeWorkout,
+    communityProfiles,
     customAccessories,
     timerSecondsRemaining,
     timerTotalSeconds,

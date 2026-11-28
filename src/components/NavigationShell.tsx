@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, Columns3, Dumbbell, List, Settings, UserRound } from 'lucide-react';
+import { Award, Columns3, Dumbbell, List, Settings, Trophy, UserRound } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { AppRoute } from '../types/models';
 import { AppLogo } from './AppLogo';
@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { route: 'splits', label: 'Splits', icon: Columns3 },
   { route: 'muscles', label: 'Muscles', icon: Award },
   { route: 'exercises', label: 'Exercises', icon: List },
+  { route: 'community', label: 'Community', icon: Trophy },
   { route: 'account', label: 'Account', icon: UserRound },
 ];
 

@@ -44,6 +44,22 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["exerciseId", "userId", "name", "muscleGroup"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Public PR leaderboard profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "bodyweightKg": { "type": "number" },
+        "bestBench": { "type": "number" },
+        "bestSquat": { "type": "number" },
+        "bestDeadlift": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "updatedAt"]
     }
   },
   "firestore": {
@@ -58,6 +74,10 @@
     "/customExercises/{exerciseId}": {
       "schema": { "$ref": "CustomExercise" },
       "description": "User custom exercises collection"
+    },
+    "/publicProfiles/{userId}": {
+      "schema": { "$ref": "PublicProfile" },
+      "description": "Public community PR leaderboard profiles"
     }
   }
 }

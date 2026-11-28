@@ -109,6 +109,28 @@ service cloud.firestore {
         (!data.keys().hasAny(['createdAt']) || (data.createdAt is string && data.createdAt.size() <= 64));
     }
 
+    function isValidPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'photoURL',
+          'bodyweightKg',
+          'bestBench',
+          'bestSquat',
+          'bestDeadlift',
+          'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.updatedAt is string && data.updatedAt.size() <= 64 &&
+        (!data.keys().hasAny(['displayName']) || (data.displayName is string && data.displayName.size() <= 128)) &&
+        (!data.keys().hasAny(['photoURL']) || (data.photoURL is string && data.photoURL.size() <= 512)) &&
+        (!data.keys().hasAny(['bodyweightKg']) || (data.bodyweightKg is number && data.bodyweightKg >= 20 && data.bodyweightKg <= 400)) &&
+        (!data.keys().hasAny(['bestBench']) || (data.bestBench is number && data.bestBench >= 0)) &&
+        (!data.keys().hasAny(['bestSquat']) || (data.bestSquat is number && data.bestSquat >= 0)) &&
+        (!data.keys().hasAny(['bestDeadlift']) || (data.bestDeadlift is number && data.bestDeadlift >= 0));
+    }
+
     match /users/{userId} {
       allow get: if isValidId(userId) && isOwner(userId);
       allow list: if false;
@@ -166,6 +188,16 @@ service cloud.firestore {
         incoming().userId == existing().userId &&
         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'muscleGroup', 'description']);
       allow delete: if isValidId(exerciseId) && isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /publicProfiles/{userId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isValidId(userId) &&
+        isSignedIn() &&
+        request.auth.uid == userId &&
+        isValidPublicProfile(incoming()) &&
+        incoming().uid == userId;
+      allow delete: if isValidId(userId) && isSignedIn() && request.auth.uid == userId;
     }
   }
 }
