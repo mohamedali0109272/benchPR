@@ -17,7 +17,7 @@ import { ExercisePickerModal } from '../components/ExercisePickerModal';
 import { PlateCalculatorModal } from '../components/PlateCalculatorModal';
 import { useWorkout } from '../context/WorkoutContext';
 import { ExerciseLibrary } from '../data/ExerciseLibrary';
-import { formatPlainWeight } from '../data/RankingEngine';
+import { formatPlainWeight, RankingEngine } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
 import {
   ActiveExerciseState,
@@ -49,6 +49,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
     toggleSetAccessory,
     applyExerciseAccessories,
     addCustomAccessory,
+    updateWeightUnit,
     startTimer,
     stopTimer,
     addSet,
@@ -83,6 +84,20 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
   );
   const progress = totalSets === 0 ? 0 : doneSets / totalSets;
 
+  let completedVolume = 0;
+  let bestEst1RM = 0;
+  for (const ex of activeWorkout.exercises) {
+    if (ex.template.isStaticHold) continue;
+    for (const s of ex.sets) {
+      if (!s.isCompleted || s.actualWeight <= 0 || s.actualReps <= 0) continue;
+      completedVolume += s.actualWeight * s.actualReps;
+      const est = RankingEngine.estimateOneRepMax(s.actualWeight, s.actualReps);
+      if (est > bestEst1RM) bestEst1RM = est;
+    }
+  }
+  completedVolume = Math.round(completedVolume * 10) / 10;
+  bestEst1RM = Math.round(bestEst1RM * 2) / 2;
+
   const handleBack = () => {
     if (doneSets > 0) {
       setShowDiscardDialog(true);
@@ -116,7 +131,31 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div
+              className="flex items-center p-0.5 rounded-xl bg-[#161B24] border border-white/10 shrink-0"
+              role="group"
+              aria-label={t('Weight Unit')}
+            >
+              {(['kg', 'lbs'] as WeightUnit[]).map((u) => {
+                const active = activeWorkout.unit === u;
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => updateWeightUnit(u)}
+                    className={`px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold uppercase transition-all cursor-pointer ${
+                      active
+                        ? 'bg-[#00E5FF] text-[#080A0F] shadow-[0_0_10px_rgba(0,229,255,0.3)]'
+                        : 'text-[#8B949E] hover:text-[#F0F6FC]'
+                    }`}
+                  >
+                    {t(u)}
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               type="button"
               onClick={() => {
@@ -127,7 +166,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
                 setPlateCalcTarget({ weight: nextSet?.actualWeight ?? 0 });
               }}
               aria-label={t('Plate Calculator')}
-              className="h-10 px-3 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 flex items-center justify-center gap-1.5 text-[#00E5FF] hover:bg-[#00E5FF]/25 active:scale-95 transition-all shrink-0 cursor-pointer"
+              className="h-10 px-2.5 sm:px-3 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 flex items-center justify-center gap-1.5 text-[#00E5FF] hover:bg-[#00E5FF]/25 active:scale-95 transition-all shrink-0 cursor-pointer"
               title={t('Plate Calculator')}
             >
               <Calculator className="w-4 h-4" />
@@ -149,7 +188,7 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
       {/* Main Scrollable Workout Body */}
       <div className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5 pb-28">
         {/* Progress Bar */}
-        <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-4 space-y-2 animate-enter">
+        <div className="rounded-2xl bg-[#131822]/90 border border-white/10 p-4 space-y-2.5 animate-enter">
           <div className="flex items-center justify-between text-xs font-bold">
             <span className="text-[#8B949E]">{t(`${doneSets} / ${totalSets} sets done`)}</span>
             <span className="text-[#00E676] font-mono-num">{Math.round(progress * 100)}%</span>
@@ -159,6 +198,20 @@ export const SessionScreen: React.FC<SessionScreenProps> = ({
               className="h-full rounded-full bg-gradient-to-r from-[#FF2D55] via-[#00E5FF] to-[#00E676] transition-all duration-500 ease-out"
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] font-bold">
+            <div className="flex items-center gap-1.5 text-[#8B949E]">
+              <span>{t('Volume')}:</span>
+              <span className="text-[#F0F6FC] font-mono-num">
+                {formatPlainWeight(completedVolume)} {t(activeWorkout.unit)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[#8B949E]">
+              <span>{t('Peak Est. 1RM')}:</span>
+              <span className="text-[#00E5FF] font-mono-num">
+                {bestEst1RM > 0 ? `${formatPlainWeight(bestEst1RM)} ${t(activeWorkout.unit)}` : '—'}
+              </span>
+            </div>
           </div>
         </div>
 

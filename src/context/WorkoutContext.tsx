@@ -10,7 +10,8 @@ import {
   computeBestDeadliftLifted,
   computeBestSquatLifted,
   deleteWorkoutById,
-  findLastLift,
+  estimateRecentLift1RM,
+  findLastExerciseSets,
   insertWorkout,
   loadCustomAccessories,
   loadPreferences,
@@ -69,6 +70,7 @@ interface WorkoutContextValue {
   updateTargetSquat1RM: (newTarget: number) => void;
   updateTargetDeadlift1RM: (newTarget: number) => void;
   updateWeightUnit: (unit: WeightUnit) => void;
+  updateTargetsAndUnit: (targets: { bench: number; squat: number; deadlift: number; unit: WeightUnit }) => void;
   setLanguage: (lang: AppLanguage) => void;
   updateBodyweightKg: (kg: number) => void;
   startSplitDay: (splitId: string, dayIndex: number) => void;
@@ -305,9 +307,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [DEMO_ACTIVITIES]);
 
   const publishPublicProfile = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, currentPrefs: StoredPreferences, workouts: WorkoutWithSets[]) => {
-    const bestB = computeBestBenchLifted(workouts);
-    const bestS = computeBestSquatLifted(workouts);
-    const bestD = computeBestDeadliftLifted(workouts);
+    const bestB = computeBestBenchLifted(workouts, 'kg');
+    const bestS = computeBestSquatLifted(workouts, 'kg');
+    const bestD = computeBestDeadliftLifted(workouts, 'kg');
     const clampedBw =
       typeof currentPrefs.bodyweightKg === 'number' &&
       Number.isFinite(currentPrefs.bodyweightKg) &&
@@ -319,9 +321,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
       uid: user.uid,
       displayName: (user.displayName || 'Athlete').slice(0, 128),
       ...(user.photoURL ? { photoURL: user.photoURL.slice(0, 512) } : {}),
-      bestBench: bestB !== null ? Math.max(0, RankingEngine.toKg(bestB, currentPrefs.weightUnit)) : 0,
-      bestSquat: bestS !== null ? Math.max(0, RankingEngine.toKg(bestS, currentPrefs.weightUnit)) : 0,
-      bestDeadlift: bestD !== null ? Math.max(0, RankingEngine.toKg(bestD, currentPrefs.weightUnit)) : 0,
+      bestBench: bestB !== null ? Math.max(0, bestB) : 0,
+      bestSquat: bestS !== null ? Math.max(0, bestS) : 0,
+      bestDeadlift: bestD !== null ? Math.max(0, bestD) : 0,
       bodyweightKg: clampedBw,
       updatedAt: new Date().toISOString(),
     };
@@ -521,11 +523,69 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [updatePrefs],
   );
 
+  const convertActiveWorkoutToUnit = useCallback((nextUnit: WeightUnit) => {
+    setActiveWorkout((current) => {
+      if (!current || current.unit === nextUnit) return current;
+      const fromUnit = current.unit;
+      const convertedTarget1RM = Math.max(1, RankingEngine.convertWeight(current.target1RM, fromUnit, nextUnit, 1));
+      return {
+        ...current,
+        unit: nextUnit,
+        target1RM: convertedTarget1RM,
+        sessionTemplate: {
+          ...current.sessionTemplate,
+          subtitle: current.sessionTemplate.subtitle.startsWith('Target 1RM:')
+            ? `Target 1RM: ${convertedTarget1RM} ${nextUnit}`
+            : current.sessionTemplate.subtitle,
+          goal: current.sessionTemplate.goal.startsWith('Build to peak goal of')
+            ? `Build to peak goal of ${convertedTarget1RM} ${nextUnit}`
+            : current.sessionTemplate.goal,
+        },
+        exercises: current.exercises.map((ex) => ({
+          ...ex,
+          calculatedTargetWeight:
+            ex.calculatedTargetWeight > 0
+              ? RankingEngine.convertWeight(ex.calculatedTargetWeight, fromUnit, nextUnit, 0.5)
+              : 0,
+          sets: ex.sets.map((s) => ({
+            ...s,
+            targetWeight: s.targetWeight > 0 ? RankingEngine.convertWeight(s.targetWeight, fromUnit, nextUnit, 0.5) : 0,
+            actualWeight: s.actualWeight > 0 ? RankingEngine.convertWeight(s.actualWeight, fromUnit, nextUnit, 0.5) : 0,
+          })),
+        })),
+      };
+    });
+  }, []);
+
   const updateWeightUnit = useCallback(
     (unit: WeightUnit) => {
-      updatePrefs((p) => ({ ...p, weightUnit: unit }));
+      updatePrefs((p) => {
+        if (p.weightUnit === unit) return p;
+        return {
+          ...p,
+          weightUnit: unit,
+          target1RM: Math.max(1, RankingEngine.convertWeight(p.target1RM, p.weightUnit, unit, 1)),
+          targetSquat1RM: Math.max(1, RankingEngine.convertWeight(p.targetSquat1RM, p.weightUnit, unit, 1)),
+          targetDeadlift1RM: Math.max(1, RankingEngine.convertWeight(p.targetDeadlift1RM, p.weightUnit, unit, 1)),
+        };
+      });
+      convertActiveWorkoutToUnit(unit);
     },
-    [updatePrefs],
+    [convertActiveWorkoutToUnit, updatePrefs],
+  );
+
+  const updateTargetsAndUnit = useCallback(
+    ({ bench, squat, deadlift, unit }: { bench: number; squat: number; deadlift: number; unit: WeightUnit }) => {
+      updatePrefs((p) => ({
+        ...p,
+        target1RM: Number.isFinite(bench) && bench > 0 ? bench : p.target1RM,
+        targetSquat1RM: Number.isFinite(squat) && squat > 0 ? squat : p.targetSquat1RM,
+        targetDeadlift1RM: Number.isFinite(deadlift) && deadlift > 0 ? deadlift : p.targetDeadlift1RM,
+        weightUnit: unit,
+      }));
+      convertActiveWorkoutToUnit(unit);
+    },
+    [convertActiveWorkoutToUnit, updatePrefs],
   );
 
   const setLanguage = useCallback(
@@ -588,18 +648,28 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     (exercises: ActiveExerciseState[], unit: WeightUnit): ActiveExerciseState[] => {
       return exercises.map((exercise) => {
         if (exercise.template.targetPercent > 0.0) return exercise;
-        const last = findLastLift(historyWorkouts, exercise.template.name);
-        if (!last) return exercise;
-        const kg = RankingEngine.toKg(last.weight, last.unit);
-        const weight = Math.round(RankingEngine.fromKg(kg, unit) * 2.0) / 2.0;
+        const lastSets = findLastExerciseSets(historyWorkouts, exercise.template.name);
+        if (lastSets.length === 0) return exercise;
+        const convertedWeights = lastSets.map((s) => {
+          const kg = RankingEngine.toKg(s.weight, s.unit);
+          return Math.round(RankingEngine.fromKg(kg, unit) * 2.0) / 2.0;
+        });
+        const peakWeight = Math.max(...convertedWeights);
         return {
           ...exercise,
-          calculatedTargetWeight: weight,
-          sets: exercise.sets.map((set) =>
-            !set.isCompleted && set.actualWeight === 0.0
-              ? { ...set, targetWeight: weight, actualWeight: weight }
-              : set,
-          ),
+          calculatedTargetWeight: peakWeight,
+          sets: exercise.sets.map((set, idx) => {
+            if (set.isCompleted || set.actualWeight !== 0.0) return set;
+            const pastIdx = Math.min(idx, convertedWeights.length - 1);
+            const setWeight = convertedWeights[pastIdx];
+            const pastReps = lastSets[pastIdx].reps;
+            return {
+              ...set,
+              targetWeight: setWeight,
+              actualWeight: setWeight,
+              actualReps: pastReps > 0 && !exercise.template.isStaticHold ? pastReps : set.actualReps,
+            };
+          }),
         };
       });
     },
@@ -717,16 +787,18 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isStaticHold: false,
       };
 
+      const recentStats = estimateRecentLift1RM(historyWorkouts, liftKind, prefs.weightUnit);
+      const working1RM = recentStats ? recentStats.est1RM : targetGoal;
       const barWeight = prefs.weightUnit === 'lbs' ? 45 : 20;
       const minPairIncrement = 5; // Smallest plate = 2.5 per side (5 total)
       const roundToPlate = (w: number) =>
         Math.max(barWeight, barWeight + Math.round((w - barWeight) / minPairIncrement) * minPairIncrement);
-      const w1 = roundToPlate(targetGoal * 0.50);
-      const w2 = roundToPlate(targetGoal * 0.70);
-      const w3 = roundToPlate(targetGoal * 0.80);
-      const t1 = roundToPlate(targetGoal * 0.875);
-      const t2 = roundToPlate(targetGoal * 0.925);
-      const b1 = roundToPlate(targetGoal * 0.75);
+      const w1 = roundToPlate(working1RM * 0.50);
+      const w2 = roundToPlate(working1RM * 0.70);
+      const w3 = roundToPlate(working1RM * 0.80);
+      const t1 = roundToPlate(working1RM * 0.875);
+      const t2 = roundToPlate(working1RM * 0.925);
+      const b1 = roundToPlate(working1RM * 0.75);
 
       const sets: ExerciseSetState[] = [
         { setIndex: 1, targetWeight: w1, targetReps: 8, actualWeight: w1, actualReps: 8, isCompleted: false, durationSeconds: 0 },
@@ -739,7 +811,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       const activeEx: ActiveExerciseState = {
         template: tpl,
-        calculatedTargetWeight: t1,
+        calculatedTargetWeight: recentStats ? recentStats.bestRecentWeight : t1,
         sets,
       };
 
@@ -760,7 +832,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isFinished: false,
       });
     },
-    [prefs.target1RM, prefs.targetSquat1RM, prefs.targetDeadlift1RM, prefs.weightUnit, stopTimer],
+    [historyWorkouts, prefs.target1RM, prefs.targetSquat1RM, prefs.targetDeadlift1RM, prefs.weightUnit, stopTimer],
   );
 
   const addExercise = useCallback(
@@ -1055,9 +1127,18 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [historyWorkouts]);
 
-  const bestBenchLifted = useMemo(() => computeBestBenchLifted(historyWorkouts), [historyWorkouts]);
-  const bestSquatLifted = useMemo(() => computeBestSquatLifted(historyWorkouts), [historyWorkouts]);
-  const bestDeadliftLifted = useMemo(() => computeBestDeadliftLifted(historyWorkouts), [historyWorkouts]);
+  const bestBenchLifted = useMemo(
+    () => computeBestBenchLifted(historyWorkouts, prefs.weightUnit),
+    [historyWorkouts, prefs.weightUnit],
+  );
+  const bestSquatLifted = useMemo(
+    () => computeBestSquatLifted(historyWorkouts, prefs.weightUnit),
+    [historyWorkouts, prefs.weightUnit],
+  );
+  const bestDeadliftLifted = useMemo(
+    () => computeBestDeadliftLifted(historyWorkouts, prefs.weightUnit),
+    [historyWorkouts, prefs.weightUnit],
+  );
   const totalWorkoutsCompleted = historyWorkouts.length;
 
   const muscleRanks = useMemo(() => {
@@ -1102,6 +1183,7 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateTargetSquat1RM,
     updateTargetDeadlift1RM,
     updateWeightUnit,
+    updateTargetsAndUnit,
     setLanguage,
     updateBodyweightKg,
     startSplitDay,

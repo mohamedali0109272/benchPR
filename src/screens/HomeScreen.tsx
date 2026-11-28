@@ -31,10 +31,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     bestDeadliftLifted,
     historyWorkouts,
     totalWorkoutsCompleted,
-    updateTarget1RM,
-    updateTargetSquat1RM,
-    updateTargetDeadlift1RM,
-    updateWeightUnit,
+    updateTargetsAndUnit,
   } = useWorkout();
   const { t } = useI18n();
 
@@ -332,11 +329,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           currentUnit={weightUnit}
           initialFocusLift={editModalLift}
           onClose={() => setEditModalLift(null)}
-          onSave={({ bench, squat, deadlift, unit }) => {
-            updateTarget1RM(bench);
-            updateTargetSquat1RM(squat);
-            updateTargetDeadlift1RM(deadlift);
-            updateWeightUnit(unit);
+          onSave={(targets) => {
+            updateTargetsAndUnit(targets);
             setEditModalLift(null);
           }}
         />

@@ -139,30 +139,36 @@ export const BENCH_NAMES = new Set(['Heavy Single', 'Bench press', 'Bench Press'
 export const SQUAT_NAMES = new Set(['Barbell Squat', 'Front Squat']);
 export const DEADLIFT_NAMES = new Set(['Deadlift', 'Sumo Deadlift', 'Romanian Deadlift', 'Stiff-Legged Deadlift']);
 
-function computeBestByNames(workouts: WorkoutWithSets[], names: Set<string>): number | null {
-  let max: number | null = null;
+function computeBestByNames(
+  workouts: WorkoutWithSets[],
+  names: Set<string>,
+  displayUnit: WeightUnit = 'kg',
+): number | null {
+  let maxKg: number | null = null;
   for (const w of workouts) {
     for (const s of w.sets) {
       if (s.isCompleted && names.has(s.exerciseName)) {
-        if (max === null || s.actualWeight > max) {
-          max = s.actualWeight;
+        const kg = RankingEngine.toKg(s.actualWeight, w.workoutLog.unit);
+        if (maxKg === null || kg > maxKg) {
+          maxKg = kg;
         }
       }
     }
   }
-  return max;
+  if (maxKg === null) return null;
+  return Math.round(RankingEngine.fromKg(maxKg, displayUnit) * 2.0) / 2.0;
 }
 
-export function computeBestBenchLifted(workouts: WorkoutWithSets[]): number | null {
-  return computeBestByNames(workouts, BENCH_NAMES);
+export function computeBestBenchLifted(workouts: WorkoutWithSets[], displayUnit: WeightUnit = 'kg'): number | null {
+  return computeBestByNames(workouts, BENCH_NAMES, displayUnit);
 }
 
-export function computeBestSquatLifted(workouts: WorkoutWithSets[]): number | null {
-  return computeBestByNames(workouts, SQUAT_NAMES);
+export function computeBestSquatLifted(workouts: WorkoutWithSets[], displayUnit: WeightUnit = 'kg'): number | null {
+  return computeBestByNames(workouts, SQUAT_NAMES, displayUnit);
 }
 
-export function computeBestDeadliftLifted(workouts: WorkoutWithSets[]): number | null {
-  return computeBestByNames(workouts, DEADLIFT_NAMES);
+export function computeBestDeadliftLifted(workouts: WorkoutWithSets[], displayUnit: WeightUnit = 'kg'): number | null {
+  return computeBestByNames(workouts, DEADLIFT_NAMES, displayUnit);
 }
 
 export function findLastLift(workouts: WorkoutWithSets[], exerciseName: string): LastLift | null {
@@ -177,6 +183,27 @@ export function findLastLift(workouts: WorkoutWithSets[], exerciseName: string):
     }
   }
   return null;
+}
+
+export function findLastExerciseSets(
+  workouts: WorkoutWithSets[],
+  exerciseName: string,
+): Array<{ weight: number; reps: number; unit: WeightUnit }> {
+  const target = exerciseName.trim().toLowerCase();
+  const sorted = [...workouts].sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
+  for (const w of sorted) {
+    const matching = w.sets.filter(
+      (s) => s.isCompleted && s.actualWeight > 0 && s.exerciseName.trim().toLowerCase() === target,
+    );
+    if (matching.length > 0) {
+      return matching.map((s) => ({
+        weight: s.actualWeight,
+        reps: s.actualReps,
+        unit: w.workoutLog.unit,
+      }));
+    }
+  }
+  return [];
 }
 
 export type MainLiftKind = 'bench' | 'squat' | 'deadlift';
@@ -203,6 +230,62 @@ function liftNameSet(lift: MainLiftKind): Set<string> {
     case 'deadlift':
       return DEADLIFT_NAMES;
   }
+}
+
+export function estimateRecentLift1RM(
+  workouts: WorkoutWithSets[],
+  lift: MainLiftKind,
+  displayUnit: WeightUnit,
+): { est1RM: number; bestRecentWeight: number } | null {
+  const sorted = [...workouts].sort((a, b) => b.workoutLog.timestamp - a.workoutLog.timestamp);
+
+  const primaryNames =
+    lift === 'bench'
+      ? new Set(['heavy single', 'bench press', 'paused bench'])
+      : lift === 'squat'
+        ? new Set(['barbell squat'])
+        : new Set(['deadlift', 'sumo deadlift']);
+
+  const fallbackNames = new Set(Array.from(liftNameSet(lift)).map((n) => n.toLowerCase()));
+
+  const collectFromNames = (allowed: Set<string>) => {
+    const matchedSessions: ExerciseSetLogEntity[][] = [];
+    const sessionUnits: WeightUnit[] = [];
+    for (const w of sorted) {
+      const matchingSets = w.sets.filter(
+        (s) =>
+          s.isCompleted &&
+          s.actualWeight > 0 &&
+          s.actualReps > 0 &&
+          allowed.has(s.exerciseName.trim().toLowerCase()),
+      );
+      if (matchingSets.length > 0) {
+        matchedSessions.push(matchingSets);
+        sessionUnits.push(w.workoutLog.unit);
+        if (matchedSessions.length >= 3) break;
+      }
+    }
+    if (matchedSessions.length === 0) return null;
+
+    let maxEstKg = 0;
+    let maxWeightKg = 0;
+    for (let i = 0; i < matchedSessions.length; i++) {
+      const unit = sessionUnits[i];
+      for (const s of matchedSessions[i]) {
+        const loadKg = RankingEngine.toKg(s.actualWeight, unit);
+        const estKg = RankingEngine.estimateOneRepMax(loadKg, s.actualReps);
+        if (estKg > maxEstKg) maxEstKg = estKg;
+        if (loadKg > maxWeightKg) maxWeightKg = loadKg;
+      }
+    }
+    if (maxEstKg <= 0) return null;
+    return {
+      est1RM: RankingEngine.fromKg(maxEstKg, displayUnit),
+      bestRecentWeight: Math.round(RankingEngine.fromKg(maxWeightKg, displayUnit) * 2) / 2,
+    };
+  };
+
+  return collectFromNames(primaryNames) ?? collectFromNames(fallbackNames);
 }
 
 export function estimateTimeToTarget1RM(

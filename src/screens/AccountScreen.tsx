@@ -5,6 +5,7 @@ import { AppUpdateCard } from '../components/AppUpdateCard';
 import { auth, isAndroidApp, logoutUser, onAuthStateChanged, openAndroidBrowserAuth, signInWithGoogle, User } from '../services/firebase';
 import { useI18n } from '../i18n/I18nContext';
 import { useWorkout } from '../context/WorkoutContext';
+import { RankingEngine } from '../data/RankingEngine';
 import { ALL_LANGUAGES } from '../i18n/AppLanguage';
 
 export const AccountScreen: React.FC = () => {
@@ -28,6 +29,19 @@ export const AccountScreen: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedSha, setCopiedSha] = useState(false);
+
+  const displayedBodyweight =
+    weightUnit === 'lbs'
+      ? Math.round(RankingEngine.fromKg(bodyweightKg, 'lbs') * 10) / 10
+      : Math.round(bodyweightKg * 10) / 10;
+  const [bwText, setBwText] = useState(() => String(displayedBodyweight));
+  const [lastSyncedBw, setLastSyncedBw] = useState(() => `${bodyweightKg}_${weightUnit}`);
+
+  const syncKey = `${bodyweightKg}_${weightUnit}`;
+  if (syncKey !== lastSyncedBw) {
+    setLastSyncedBw(syncKey);
+    setBwText(String(displayedBodyweight));
+  }
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
 
@@ -257,15 +271,43 @@ export const AccountScreen: React.FC = () => {
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                min="30"
-                max="300"
+                min={weightUnit === 'lbs' ? 45 : 20}
+                max={weightUnit === 'lbs' ? 880 : 400}
                 step="0.5"
-                value={bodyweightKg}
-                onChange={(e) => updateBodyweightKg(parseFloat(e.target.value) || 75)}
+                value={bwText}
+                onChange={(e) => {
+                  const valStr = e.target.value;
+                  setBwText(valStr);
+                  const parsed = parseFloat(valStr.replace(',', '.'));
+                  if (Number.isFinite(parsed)) {
+                    const kgVal = weightUnit === 'lbs' ? RankingEngine.toKg(parsed, 'lbs') : parsed;
+                    if (kgVal >= 20 && kgVal <= 400) {
+                      const roundedKg = Math.round(kgVal * 10) / 10;
+                      setLastSyncedBw(`${roundedKg}_${weightUnit}`);
+                      updateBodyweightKg(roundedKg);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = parseFloat(bwText.replace(',', '.'));
+                  if (!Number.isFinite(parsed)) {
+                    setBwText(String(displayedBodyweight));
+                    return;
+                  }
+                  const kgVal = weightUnit === 'lbs' ? RankingEngine.toKg(parsed, 'lbs') : parsed;
+                  const clampedKg = Math.min(400, Math.max(20, Math.round(kgVal * 10) / 10));
+                  updateBodyweightKg(clampedKg);
+                  const display =
+                    weightUnit === 'lbs'
+                      ? Math.round(RankingEngine.fromKg(clampedKg, 'lbs') * 10) / 10
+                      : clampedKg;
+                  setLastSyncedBw(`${clampedKg}_${weightUnit}`);
+                  setBwText(String(display));
+                }}
                 aria-label={t('Bodyweight')}
                 className="w-20 px-3 py-1.5 rounded-xl bg-[#19202D] border border-white/10 text-xs font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#00E5FF]"
               />
-              <span className="text-xs font-bold text-[#8B949E]">kg</span>
+              <span className="text-xs font-bold text-[#8B949E]">{t(weightUnit)}</span>
             </div>
           </div>
 
@@ -273,16 +315,19 @@ export const AccountScreen: React.FC = () => {
 
           {/* Target PRs Settings */}
           <div className="space-y-3">
-            <span className="text-xs font-bold text-[#F0F6FC]">{t('Target 1RM Goals')}</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[#F0F6FC]">{t('Target 1RM Goals')}</span>
+              <span className="text-[11px] font-bold font-mono text-[#8B949E] uppercase">({t(weightUnit)})</span>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-[#FF2D55] font-bold block mb-1">{t('Bench')}</label>
                 <input
                   type="number"
                   min="20"
-                  max="500"
+                  max={weightUnit === 'lbs' ? 1100 : 500}
                   value={target1RM}
-                  onChange={(e) => updateTarget1RM(parseFloat(e.target.value) || 100)}
+                  onChange={(e) => updateTarget1RM(parseFloat(e.target.value) || (weightUnit === 'lbs' ? 225 : 100))}
                   aria-label={t('Bench target 1RM')}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-[#19202D] border border-white/10 text-xs font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#FF2D55]"
                 />
@@ -292,9 +337,9 @@ export const AccountScreen: React.FC = () => {
                 <input
                   type="number"
                   min="20"
-                  max="600"
+                  max={weightUnit === 'lbs' ? 1350 : 600}
                   value={targetSquat1RM}
-                  onChange={(e) => updateTargetSquat1RM(parseFloat(e.target.value) || 140)}
+                  onChange={(e) => updateTargetSquat1RM(parseFloat(e.target.value) || (weightUnit === 'lbs' ? 315 : 140))}
                   aria-label={t('Squat target 1RM')}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-[#19202D] border border-white/10 text-xs font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#00E5FF]"
                 />
@@ -304,9 +349,9 @@ export const AccountScreen: React.FC = () => {
                 <input
                   type="number"
                   min="20"
-                  max="700"
+                  max={weightUnit === 'lbs' ? 1550 : 700}
                   value={targetDeadlift1RM}
-                  onChange={(e) => updateTargetDeadlift1RM(parseFloat(e.target.value) || 180)}
+                  onChange={(e) => updateTargetDeadlift1RM(parseFloat(e.target.value) || (weightUnit === 'lbs' ? 405 : 180))}
                   aria-label={t('Deadlift target 1RM')}
                   className="w-full px-2.5 py-1.5 rounded-xl bg-[#19202D] border border-white/10 text-xs font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#B26BFF]"
                 />

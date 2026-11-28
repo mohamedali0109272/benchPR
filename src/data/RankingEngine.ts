@@ -55,6 +55,14 @@ export const RankingEngine = {
     return unit.toLowerCase() === 'lbs' ? kg * LBS_PER_KG : kg;
   },
 
+  convertWeight(value: number, from: WeightUnit, to: WeightUnit, step = 0.5): number {
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    if (from === to) return value;
+    const raw = RankingEngine.fromKg(RankingEngine.toKg(value, from), to);
+    if (step <= 0) return raw;
+    return Math.round(raw / step) * step;
+  },
+
   estimateOneRepMax(loadKg: number, reps: number): number {
     if (loadKg <= 0.0 || reps <= 0) return 0.0;
     if (reps === 1) return loadKg;

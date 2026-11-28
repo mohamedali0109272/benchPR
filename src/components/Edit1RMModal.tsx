@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { RankingEngine } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
 import { WeightUnit } from '../types/models';
 
@@ -33,6 +34,18 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
   const parsePositive = (raw: string, fallback: number) => {
     const parsed = parseFloat(raw.replace(',', '.'));
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
+  const handleUnitSwitch = (nextUnit: WeightUnit) => {
+    if (nextUnit === selectedUnit) return;
+    const convertStr = (raw: string, fallback: number) => {
+      const val = parsePositive(raw, fallback);
+      return String(Math.max(1, RankingEngine.convertWeight(val, selectedUnit, nextUnit, 1)));
+    };
+    setBenchText((prev) => convertStr(prev, currentBench1RM));
+    setSquatText((prev) => convertStr(prev, currentSquat1RM));
+    setDeadliftText((prev) => convertStr(prev, currentDeadlift1RM));
+    setSelectedUnit(nextUnit);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,7 +88,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-bold tracking-wide text-[#FF6B8B] mb-1.5">
-                {t('Bench 1RM')}
+                {t('Bench 1RM')} ({t(selectedUnit)})
               </label>
               <input
                 type="number"
@@ -90,7 +103,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold tracking-wide text-[#00E5FF] mb-1.5">
-                {t('Squat 1RM')}
+                {t('Squat 1RM')} ({t(selectedUnit)})
               </label>
               <input
                 type="number"
@@ -105,7 +118,7 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold tracking-wide text-[#B26BFF] mb-1.5">
-                {t('Deadlift 1RM')}
+                {t('Deadlift 1RM')} ({t(selectedUnit)})
               </label>
               <input
                 type="number"
@@ -126,8 +139,8 @@ export const Edit1RMModal: React.FC<Edit1RMModalProps> = ({
                 <button
                   key={u}
                   type="button"
-                  onClick={() => setSelectedUnit(u)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onClick={() => handleUnitSwitch(u)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all cursor-pointer ${
                     selectedUnit === u
                       ? 'bg-gradient-to-r from-[#FF2D55] to-[#FF334B] text-[#080A0F] shadow-sm'
                       : 'text-[#8B949E] hover:text-[#F0F6FC]'

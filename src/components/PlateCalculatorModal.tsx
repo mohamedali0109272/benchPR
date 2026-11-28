@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Calculator, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { RankingEngine } from '../data/RankingEngine';
 import { useI18n } from '../i18n/I18nContext';
 import { WeightUnit } from '../types/models';
 
@@ -46,6 +47,20 @@ function saveEnabledPlates(unit: WeightUnit, plates: number[]): void {
 
 function formatNum(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+}
+
+function mapBarbellForUnit(weight: number, from: WeightUnit, to: WeightUnit): number {
+  if (from === to) return weight;
+  if (to === 'lbs') {
+    if (weight === 20) return 45;
+    if (weight === 15) return 35;
+    if (weight === 10) return 15;
+    return BARBELL_OPTIONS.lbs[0];
+  }
+  if (weight === 45) return 20;
+  if (weight === 35) return 15;
+  if (weight === 15) return 10;
+  return BARBELL_OPTIONS.kg[0];
 }
 
 interface PlateBreakdownItem {
@@ -159,15 +174,46 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
   onSelectWeight,
 }) => {
   const { t } = useI18n();
-  const standardPlates = STANDARD_PLATES[unit];
-  const barbellOptions = BARBELL_OPTIONS[unit];
-  const defaultBarbell = barbellOptions[0];
+  const initialTarget = initialWeight > 0 ? initialWeight : unit === 'kg' ? 100 : 225;
 
-  const [targetWeight, setTargetWeight] = useState<number>(
-    initialWeight > 0 ? initialWeight : unit === 'kg' ? 100 : 225,
-  );
-  const [barbellWeight, setBarbellWeight] = useState<number>(defaultBarbell);
+  const [activeUnit, setActiveUnit] = useState<WeightUnit>(unit);
+  const [prevPropUnit, setPrevPropUnit] = useState<WeightUnit>(unit);
+  const [targetWeight, setTargetWeight] = useState<number>(initialTarget);
+  const [targetWeightText, setTargetWeightText] = useState<string>(() => formatNum(initialTarget));
+  const [barbellWeight, setBarbellWeight] = useState<number>(BARBELL_OPTIONS[unit][0]);
   const [enabledPlates, setEnabledPlates] = useState<number[]>(() => loadEnabledPlates(unit));
+
+  const switchUnit = (nextUnit: WeightUnit, fromUnit: WeightUnit) => {
+    const nextBarbell = mapBarbellForUnit(barbellWeight, fromUnit, nextUnit);
+    const nextEnabled = loadEnabledPlates(nextUnit);
+    const converted =
+      targetWeight > 0
+        ? RankingEngine.convertWeight(targetWeight, fromUnit, nextUnit, 0.5)
+        : nextUnit === 'kg'
+          ? 100
+          : 225;
+    setActiveUnit(nextUnit);
+    setBarbellWeight(nextBarbell);
+    setEnabledPlates(nextEnabled);
+    setTargetWeight(converted);
+    setTargetWeightText(formatNum(converted));
+  };
+
+  if (unit !== prevPropUnit) {
+    setPrevPropUnit(unit);
+    if (unit !== activeUnit) {
+      switchUnit(unit, activeUnit);
+    }
+  }
+
+  const standardPlates = STANDARD_PLATES[activeUnit];
+  const barbellOptions = BARBELL_OPTIONS[activeUnit];
+
+  const updateTargetWeight = (next: number) => {
+    const rounded = Math.max(0, Math.round(next * 100) / 100);
+    setTargetWeight(rounded);
+    setTargetWeightText(formatNum(rounded));
+  };
 
   const minIncrement = useMemo(() => {
     const smallest = enabledPlates.length > 0 ? Math.min(...enabledPlates) : standardPlates[standardPlates.length - 1];
@@ -179,6 +225,11 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
     [targetWeight, barbellWeight, enabledPlates],
   );
 
+  const convertedForSet =
+    activeUnit === unit
+      ? breakdown.actualTotal
+      : RankingEngine.convertWeight(breakdown.actualTotal, activeUnit, unit, 0.5);
+
   const togglePlateAvailability = (plate: number) => {
     setEnabledPlates((prev) => {
       const exists = prev.includes(plate);
@@ -186,27 +237,23 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
       const next = exists
         ? prev.filter((p) => p !== plate)
         : [...prev, plate].sort((a, b) => b - a);
-      saveEnabledPlates(unit, next);
+      saveEnabledPlates(activeUnit, next);
       return next;
     });
   };
 
   const stepByIncrement = (direction: 1 | -1) => {
-    setTargetWeight((prev) => {
-      const base = Math.max(barbellWeight, prev);
-      const next =
-        direction === 1
-          ? breakdown.actualTotal + minIncrement
-          : Math.max(barbellWeight, (breakdown.remainderTotal > 0.01 ? breakdown.actualTotal : base - minIncrement));
-      return Math.round(next * 100) / 100;
-    });
+    const base = Math.max(barbellWeight, targetWeight);
+    const next =
+      direction === 1
+        ? breakdown.actualTotal + minIncrement
+        : Math.max(barbellWeight, breakdown.remainderTotal > 0.01 ? breakdown.actualTotal : base - minIncrement);
+    updateTargetWeight(next);
   };
 
   const adjustByPlatePair = (plate: number, sign: 1 | -1) => {
-    setTargetWeight((prev) => {
-      const next = Math.max(barbellWeight, prev + sign * plate * 2);
-      return Math.round(next * 100) / 100;
-    });
+    const next = Math.max(barbellWeight, targetWeight + sign * plate * 2);
+    updateTargetWeight(next);
   };
 
   const leftSleevePlates = useMemo(
@@ -244,17 +291,47 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#00E5FF] to-[#00E676] flex items-center justify-center text-[#080A0F] shadow-[0_0_20px_rgba(0,229,255,0.4)]">
-            <Calculator className="w-6 h-6" />
+        <div className="flex flex-wrap items-center justify-between gap-3 pe-10">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#00E5FF] to-[#00E676] flex items-center justify-center text-[#080A0F] shadow-[0_0_20px_rgba(0,229,255,0.4)] shrink-0">
+              <Calculator className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#00E5FF]">
+                {t('Barbell Setup')}
+              </span>
+              <h2 className="text-lg font-black text-[#F0F6FC]">
+                {t('Plate Calculator')}
+              </h2>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#00E5FF]">
-              {t('Barbell Setup')}
-            </span>
-            <h2 className="text-lg font-black text-[#F0F6FC]">
-              {t('Plate Calculator')}
-            </h2>
+
+          <div
+            className="flex items-center p-1 rounded-xl bg-[#0D1119] border border-white/10 shrink-0"
+            role="group"
+            aria-label={t('Weight Unit')}
+          >
+            {(['kg', 'lbs'] as WeightUnit[]).map((u) => {
+              const active = activeUnit === u;
+              return (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => {
+                    if (u !== activeUnit) {
+                      switchUnit(u, activeUnit);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase transition-all cursor-pointer ${
+                    active
+                      ? 'bg-[#00E5FF] text-[#080A0F] shadow-[0_0_10px_rgba(0,229,255,0.3)]'
+                      : 'text-[#8B949E] hover:text-[#F0F6FC]'
+                  }`}
+                >
+                  {t(u)}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -263,17 +340,17 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
           <div className="bg-[#19202D] p-3.5 rounded-2xl border border-white/10 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <label className="text-[11px] font-bold text-[#8B949E]">
-                {t('Target Weight')} ({t(unit)})
+                {t('Target Weight')} ({t(activeUnit)})
               </label>
               <span className="text-[10px] font-mono font-bold text-[#00E5FF]">
-                ±{formatNum(minIncrement)} {t(unit)}
+                ±{formatNum(minIncrement)} {t(activeUnit)}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => stepByIncrement(-1)}
-                aria-label={`${t('Decrease by')} ${formatNum(minIncrement)} ${unit}`}
+                aria-label={`${t('Decrease by')} ${formatNum(minIncrement)} ${activeUnit}`}
                 className="w-10 h-10 rounded-xl bg-[#0D1119] border border-white/10 flex items-center justify-center text-[#F0F6FC] hover:border-[#FF2D55]/60 hover:text-[#FF2D55] active:scale-95 transition-all cursor-pointer shrink-0"
               >
                 <Minus className="w-4 h-4" />
@@ -281,17 +358,27 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               <input
                 type="number"
                 min="0"
-                max="1000"
+                max={activeUnit === 'lbs' ? 2200 : 1000}
                 step={minIncrement}
-                value={targetWeight}
-                onChange={(e) => setTargetWeight(Math.max(0, parseFloat(e.target.value) || 0))}
+                value={targetWeightText}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setTargetWeightText(raw);
+                  const parsed = parseFloat(raw.replace(',', '.'));
+                  if (Number.isFinite(parsed) && parsed >= 0) {
+                    setTargetWeight(parsed);
+                  } else if (raw.trim() === '') {
+                    setTargetWeight(0);
+                  }
+                }}
+                onBlur={() => setTargetWeightText(formatNum(targetWeight))}
                 aria-label={t('Target Weight')}
                 className="flex-1 min-w-0 px-2 py-2 rounded-xl bg-[#0D1119] border border-white/10 text-base font-black font-mono-num text-[#F0F6FC] text-center focus:outline-none focus:border-[#00E5FF]"
               />
               <button
                 type="button"
                 onClick={() => stepByIncrement(1)}
-                aria-label={`${t('Increase by')} ${formatNum(minIncrement)} ${unit}`}
+                aria-label={`${t('Increase by')} ${formatNum(minIncrement)} ${activeUnit}`}
                 className="w-10 h-10 rounded-xl bg-[#0D1119] border border-white/10 flex items-center justify-center text-[#F0F6FC] hover:border-[#00E676]/60 hover:text-[#00E676] active:scale-95 transition-all cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
@@ -302,11 +389,11 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
           <div className="bg-[#19202D] p-3.5 rounded-2xl border border-white/10 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <label className="text-[11px] font-bold text-[#8B949E]">
-                {t('Barbell Weight')} ({t(unit)})
+                {t('Barbell Weight')} ({t(activeUnit)})
               </label>
               <button
                 type="button"
-                onClick={() => setTargetWeight(barbellWeight)}
+                onClick={() => updateTargetWeight(barbellWeight)}
                 className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8B949E] hover:text-[#F0F6FC] cursor-pointer"
                 title={t('Reset to bar only')}
               >
@@ -326,7 +413,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                       : 'bg-[#0D1119] border border-white/10 text-[#8B949E] hover:text-[#F0F6FC]'
                   }`}
                 >
-                  {b} {t(unit)}
+                  {b} {t(activeUnit)}
                 </button>
               ))}
             </div>
@@ -340,7 +427,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               {t('Plate Increments (Tap to toggle / + to add pair)')}
             </span>
             <span className="text-[10px] font-mono font-bold text-[#6E7681]">
-              {t('Min step')}: {formatNum(minIncrement)} {t(unit)}
+              {t('Min step')}: {formatNum(minIncrement)} {t(activeUnit)}
             </span>
           </div>
 
@@ -378,9 +465,9 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                     <button
                       type="button"
                       onClick={() => adjustByPlatePair(plate, 1)}
-                      aria-label={`${t('Add pair of')} ${plate} ${unit}`}
+                      aria-label={`${t('Add pair of')} ${plate} ${activeUnit}`}
                       className="px-2 py-1.5 bg-white/5 hover:bg-[#00E5FF]/20 text-[#00E5FF] text-xs font-bold border-s border-white/10 cursor-pointer transition-colors"
-                      title={`+${formatNum(plate * 2)} ${unit}`}
+                      title={`+${formatNum(plate * 2)} ${activeUnit}`}
                     >
                       +
                     </button>
@@ -398,8 +485,15 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               <span className="text-[11px] font-bold text-[#8B949E] block">
                 {t('Actual Loaded Total')}
               </span>
-              <div className="text-2xl font-black font-mono-num text-[#00E676]">
-                {formatNum(breakdown.actualTotal)} {t(unit)}
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono-num text-[#00E676]">
+                  {formatNum(breakdown.actualTotal)} {t(activeUnit)}
+                </span>
+                {activeUnit !== unit && (
+                  <span className="text-xs font-bold font-mono-num text-[#8B949E]">
+                    (≈ {formatNum(convertedForSet)} {t(unit)})
+                  </span>
+                )}
               </div>
             </div>
 
@@ -410,7 +504,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               <div className="text-sm font-black font-mono-num text-[#F0F6FC]">
                 {breakdown.totalPlateCount} {t(breakdown.totalPlateCount === 1 ? 'plate' : 'plates')}
                 <span className="text-xs font-semibold text-[#00E5FF] ms-1.5">
-                  ({formatNum(breakdown.perSideTotalWeight)} {t(unit)} / {t('side')})
+                  ({formatNum(breakdown.perSideTotalWeight)} {t(activeUnit)} / {t('side')})
                 </span>
               </div>
             </div>
@@ -420,23 +514,23 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
           {Math.abs(breakdown.remainderTotal) > 0.01 && targetWeight > barbellWeight && (
             <div className="rounded-xl bg-[#FFC21A]/10 border border-[#FFC21A]/35 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-[#FFC21A] font-semibold">
-                {t('Exact weight unavailable with selected plates')} ({breakdown.remainderTotal > 0 ? `+${formatNum(breakdown.remainderTotal)}` : formatNum(breakdown.remainderTotal)} {t(unit)})
+                {t('Exact weight unavailable with selected plates')} ({breakdown.remainderTotal > 0 ? `+${formatNum(breakdown.remainderTotal)}` : formatNum(breakdown.remainderTotal)} {t(activeUnit)})
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setTargetWeight(breakdown.actualTotal)}
+                  onClick={() => updateTargetWeight(breakdown.actualTotal)}
                   className="px-2 py-1 rounded-lg bg-[#FFC21A]/20 text-[#FFC21A] font-mono font-bold hover:bg-[#FFC21A]/30 cursor-pointer"
                 >
-                  {formatNum(breakdown.actualTotal)} {t(unit)}
+                  {formatNum(breakdown.actualTotal)} {t(activeUnit)}
                 </button>
                 {breakdown.nextHigherTotal !== null && (
                   <button
                     type="button"
-                    onClick={() => setTargetWeight(breakdown.nextHigherTotal!)}
+                    onClick={() => updateTargetWeight(breakdown.nextHigherTotal!)}
                     className="px-2 py-1 rounded-lg bg-[#00E5FF]/20 text-[#00E5FF] font-mono font-bold hover:bg-[#00E5FF]/30 cursor-pointer"
                   >
-                    {formatNum(breakdown.nextHigherTotal)} {t(unit)}
+                    {formatNum(breakdown.nextHigherTotal)} {t(activeUnit)}
                   </button>
                 )}
               </div>
@@ -455,7 +549,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               {/* Left Plates (heaviest closest to center, ordered outward to the left) */}
               <div className="flex items-center flex-row-reverse gap-1 px-1 z-10">
                 {leftSleevePlates.map(({ plate, key }) => {
-                  const style = getPlateStyle(plate, unit);
+                  const style = getPlateStyle(plate, activeUnit);
                   return (
                     <div
                       key={key}
@@ -464,7 +558,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                         width: `${style.widthPx}px`,
                         height: `${style.heightPx}px`,
                       }}
-                      title={`${formatNum(plate)} ${unit}`}
+                      title={`${formatNum(plate)} ${activeUnit}`}
                     >
                       <span className="text-[9px] leading-none tracking-tighter">
                         {formatNum(plate)}
@@ -479,7 +573,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
 
               {/* Center Barbell */}
               <div className="w-16 sm:w-24 h-5 bg-[#484F58] rounded-xs z-10 flex items-center justify-center font-extrabold text-[10px] tracking-wider text-[#F0F6FC] border-x border-white/20 mx-0.5">
-                {barbellWeight} {t(unit)}
+                {barbellWeight} {t(activeUnit)}
               </div>
 
               {/* Right Collar */}
@@ -488,7 +582,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
               {/* Right Plates (heaviest closest to center, ordered outward to the right) */}
               <div className="flex items-center gap-1 px-1 z-10">
                 {rightSleevePlates.map(({ plate, key }) => {
-                  const style = getPlateStyle(plate, unit);
+                  const style = getPlateStyle(plate, activeUnit);
                   return (
                     <div
                       key={key}
@@ -497,7 +591,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                         width: `${style.widthPx}px`,
                         height: `${style.heightPx}px`,
                       }}
-                      title={`${formatNum(plate)} ${unit}`}
+                      title={`${formatNum(plate)} ${activeUnit}`}
                     >
                       <span className="text-[9px] leading-none tracking-tighter">
                         {formatNum(plate)}
@@ -524,7 +618,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {breakdown.items.map(({ plate, perSide, totalPlates }) => {
-                  const style = getPlateStyle(plate, unit);
+                  const style = getPlateStyle(plate, activeUnit);
                   return (
                     <div
                       key={plate}
@@ -538,11 +632,11 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                         </span>
                         <div>
                           <div className="text-xs font-bold font-mono-num text-[#F0F6FC]">
-                            {perSide}× {formatNum(plate)} {t(unit)}{' '}
+                            {perSide}× {formatNum(plate)} {t(activeUnit)}{' '}
                             <span className="text-[#8B949E] font-normal">/ {t('side')}</span>
                           </div>
                           <div className="text-[10px] font-semibold font-mono-num text-[#00E5FF]">
-                            {totalPlates} {t('total plates')} ({formatNum(plate * totalPlates)} {t(unit)})
+                            {totalPlates} {t('total plates')} ({formatNum(plate * totalPlates)} {t(activeUnit)})
                           </div>
                         </div>
                       </div>
@@ -551,7 +645,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                         <button
                           type="button"
                           onClick={() => adjustByPlatePair(plate, -1)}
-                          aria-label={`${t('Remove pair of')} ${plate} ${unit}`}
+                          aria-label={`${t('Remove pair of')} ${plate} ${activeUnit}`}
                           className="w-6 h-6 rounded-lg bg-[#0D1119] border border-white/10 flex items-center justify-center text-[#8B949E] hover:text-[#FF2D55] cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
@@ -559,7 +653,7 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
                         <button
                           type="button"
                           onClick={() => adjustByPlatePair(plate, 1)}
-                          aria-label={`${t('Add pair of')} ${plate} ${unit}`}
+                          aria-label={`${t('Add pair of')} ${plate} ${activeUnit}`}
                           className="w-6 h-6 rounded-lg bg-[#0D1119] border border-white/10 flex items-center justify-center text-[#8B949E] hover:text-[#00E676] cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
@@ -579,12 +673,13 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                onSelectWeight(breakdown.actualTotal);
+                onSelectWeight(convertedForSet);
                 onClose();
               }}
               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#00E676] text-[#080A0F] font-black text-xs tracking-wider shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
             >
-              {t('APPLY WEIGHT TO SET')} ({formatNum(breakdown.actualTotal)} {t(unit)})
+              {t('APPLY WEIGHT TO SET')} ({formatNum(breakdown.actualTotal)} {t(activeUnit)}
+              {activeUnit !== unit ? ` ≈ ${formatNum(convertedForSet)} ${t(unit)}` : ''})
             </button>
           )}
           <button
@@ -599,3 +694,4 @@ export const PlateCalculatorModal: React.FC<PlateCalculatorModalProps> = ({
     </div>
   );
 };
+

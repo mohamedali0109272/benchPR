@@ -434,4 +434,9 @@ export const uiStrings: Record<string, string> = {
   'Click to enable plate': 'اضغط لتفعيل الطارة',
   "Package signing key differs from the installed build. Uninstall PR TRACKER once, then install the new APK from GitHub Releases.":
     'مفتاح توقيع التحديث يختلف عن النسخة المثبتة حالياً. احذف تطبيق PR TRACKER مرة واحدة ثم ثبّت التحديث الجديد من صفحة الإصدارات على GitHub.',
+  'Weight Unit': 'وحدة الوزن',
+  'Choose kg or lbs for lifts': 'اختر كجم أو رطل لأوزان التمارين',
+  'Preferences & Settings': 'التفضيلات والإعدادات',
+  'Target 1RM Goals': 'أهداف 1RM المستهدفة',
+  'Peak Est. 1RM': 'أعلى 1RM تقديري',
 };
