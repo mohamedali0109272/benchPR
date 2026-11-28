@@ -251,4 +251,13 @@ export interface PublicProfileEntity {
   updatedAt: string;
 }
 
+export interface ActivityEntity {
+  id: string;
+  uid: string;
+  displayName?: string;
+  photoURL?: string;
+  message: string;
+  timestamp: number;
+}
+
 export type AppRoute = 'home' | 'splits' | 'split-detail' | 'muscles' | 'exercises' | 'session' | 'history' | 'community' | 'account';

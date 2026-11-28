@@ -37,6 +37,7 @@ import {
   WorkoutWithSets,
   LiftingAccessory,
   PublicProfileEntity,
+  ActivityEntity,
 } from '../types/models';
 
 interface WorkoutContextValue {
@@ -55,6 +56,9 @@ interface WorkoutContextValue {
   overallRank: OverallRank;
   activeWorkout: ActiveWorkoutState | null;
   communityProfiles: PublicProfileEntity[];
+  activities: ActivityEntity[];
+  followingUids: string[];
+  toggleFollow: (uid: string) => void;
   customAccessories: string[];
   timerSecondsRemaining: number;
   timerTotalSeconds: number;
@@ -182,6 +186,97 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const language = useMemo(() => resolveLanguage(prefs.languageCode), [prefs.languageCode]);
 
   const [communityProfiles, setCommunityProfiles] = useState<PublicProfileEntity[]>([]);
+  const [activities, setActivities] = useState<ActivityEntity[]>([]);
+  const [followingUids, setFollowingUids] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('benchpr_following_v1');
+      return raw ? JSON.parse(raw) : ['demo_1', 'demo_2'];
+    } catch {
+      return ['demo_1', 'demo_2'];
+    }
+  });
+
+  const toggleFollow = useCallback((targetUid: string) => {
+    setFollowingUids((prev) => {
+      const next = prev.includes(targetUid)
+        ? prev.filter((id) => id !== targetUid)
+        : [...prev, targetUid];
+      try {
+        localStorage.setItem('benchpr_following_v1', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const publishActivity = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, message: string) => {
+    const act: ActivityEntity = {
+      id: `${user.uid}_${Date.now()}`,
+      uid: user.uid,
+      displayName: user.displayName || 'Athlete',
+      photoURL: user.photoURL || undefined,
+      message,
+      timestamp: Date.now(),
+    };
+    try {
+      await setDoc(doc(db, 'activities', act.id), act);
+      setActivities((prev) => [act, ...prev]);
+    } catch (err) {
+      console.error('Failed to publish activity:', err);
+    }
+  }, []);
+
+  // Fetch activities on mount
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'activities'));
+        const acts: ActivityEntity[] = snap.docs.map((d) => d.data() as ActivityEntity);
+        if (acts.length > 0) {
+          setActivities(acts.sort((a, b) => b.timestamp - a.timestamp));
+        } else {
+          setActivities([
+            {
+              id: 'act_1',
+              uid: 'demo_1',
+              displayName: 'Alex Thor',
+              photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+              message: 'hit a new Bench Press PR: 140 kg with Belt & Wrist Wraps',
+              timestamp: Date.now() - 1000 * 60 * 45,
+            },
+            {
+              id: 'act_2',
+              uid: 'demo_2',
+              displayName: 'Sarah Lift',
+              photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+              message: 'completed Heavy Squat Session with 150 kg (RPE 9)',
+              timestamp: Date.now() - 1000 * 60 * 180,
+            },
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch activities:', err);
+        setActivities([
+          {
+            id: 'act_1',
+            uid: 'demo_1',
+            displayName: 'Alex Thor',
+            photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            message: 'hit a new Bench Press PR: 140 kg with Belt & Wrist Wraps',
+            timestamp: Date.now() - 1000 * 60 * 45,
+          },
+          {
+            id: 'act_2',
+            uid: 'demo_2',
+            displayName: 'Sarah Lift',
+            photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+            message: 'completed Heavy Squat Session with 150 kg (RPE 9)',
+            timestamp: Date.now() - 1000 * 60 * 180,
+          },
+        ]);
+      }
+    };
+    fetchActivities();
+  }, []);
 
   const publishPublicProfile = useCallback(async (user: { uid: string; displayName: string | null; photoURL: string | null }, currentPrefs: StoredPreferences, workouts: WorkoutWithSets[]) => {
     const bestB = computeBestBenchLifted(workouts);
@@ -860,12 +955,13 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
           console.error('Failed to save workout to Firestore:', err);
         });
         publishPublicProfile(user, prefs, nextWorkouts);
+        publishActivity(user, `completed workout session "${activeWorkout.sessionTemplate.title}"`);
       }
 
       setActiveWorkout(null);
       onSaved();
     },
-    [activeWorkout, historyWorkouts, prefs, publishPublicProfile, stopTimer],
+    [activeWorkout, historyWorkouts, prefs, publishActivity, publishPublicProfile, stopTimer],
   );
 
   const cancelWorkout = useCallback(() => {
@@ -921,6 +1017,9 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
     overallRank,
     activeWorkout,
     communityProfiles,
+    activities,
+    followingUids,
+    toggleFollow,
     customAccessories,
     timerSecondsRemaining,
     timerTotalSeconds,
